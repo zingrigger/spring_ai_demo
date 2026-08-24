@@ -56,6 +56,8 @@ Supported cities are 北京/Beijing, 上海/Shanghai, 广州/Guangzhou, 深圳/S
 
 ## Connect an MCP Client
 
+完整测试步骤（包括不接入 Agent 的直连测试和接入外部 Agent 的测试）见 [WeatherTool 测试说明](docs/weather-tool-testing.md)。
+
 The Streamable HTTP endpoint is:
 
 ```text
