@@ -25,6 +25,7 @@ public final class WeatherTool {
     @Tool(name = "get_weather_by_city", description = "查询指定城市的当前天气")
     public WeatherToolResult getWeatherByCity(
             @ToolParam(description = "城市名称，例如北京或 Beijing") String city) {
+        logger.info("打印 tool - get_weather_by_city 参数：{}", city);
         if (city == null || city.isBlank()) {
             throw new WeatherToolException("城市名称不能为空");
         }
