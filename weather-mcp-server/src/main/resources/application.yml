@@ -38,3 +38,8 @@ info:
   app:
     name: ${spring.application.name}
     description: Streamable HTTP weather MCP server
+
+user-context:
+  source: ${USER_CONTEXT_SOURCE:bearer-token}   # bearer-token | explicit-headers
+  jwt:
+    secret: ${USER_CONTEXT_JWT_SECRET:demo-secret-change-me-0123456789abcdef}  # HS256 需 >=32 字节
