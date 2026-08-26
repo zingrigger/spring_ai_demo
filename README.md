@@ -70,6 +70,8 @@ Supported cities are 北京/Beijing, 上海/Shanghai, 广州/Guangzhou, 深圳/S
 | `USER_CONTEXT_SOURCE` | `bearer-token` | `bearer-token` 或 `explicit-headers` |
 | `USER_CONTEXT_JWT_SECRET` | `demo-secret-change-me-0123456789abcdef` | HS256 密钥，需 ≥32 字节 |
 
+> 注意：默认密钥仅用于本地演示，任何真实部署都必须通过 USER_CONTEXT_JWT_SECRET 覆盖。
+
 ### 生成测试 JWT
 
 使用默认密钥生成带 `userId`/`tenantId` claims 的 token（有效期 1 小时）：

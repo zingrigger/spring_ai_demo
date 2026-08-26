@@ -34,6 +34,23 @@ class UserContextFeignInterceptorTest {
     }
 
     @Test
+    void addsNoHeadersForAllNullContext() {
+        UserContextHolder.set(new UserContext(null, null));
+        RequestTemplate template = new RequestTemplate();
+        interceptor.apply(template);
+        assertThat(template.headers()).doesNotContainKeys("X-User-Id", "X-User-Tenant");
+    }
+
+    @Test
+    void skipsBlankUserId() {
+        UserContextHolder.set(new UserContext(" ", "acme"));
+        RequestTemplate template = new RequestTemplate();
+        interceptor.apply(template);
+        assertThat(template.headers()).doesNotContainKey("X-User-Id");
+        assertThat(template.headers().get("X-User-Tenant")).containsExactly("acme");
+    }
+
+    @Test
     void addsNoHeadersWithoutContext() {
         RequestTemplate template = new RequestTemplate();
         interceptor.apply(template);

@@ -3,6 +3,7 @@ package com.example.weather.mcp.usercontext;
 import feign.RequestInterceptor;
 import feign.RequestTemplate;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 @Component
 public final class UserContextFeignInterceptor implements RequestInterceptor {
@@ -16,10 +17,11 @@ public final class UserContextFeignInterceptor implements RequestInterceptor {
         if (context == null) {
             return;
         }
-        if (context.userId() != null) {
+        // 该拦截器对本模块所有 Feign 客户端生效（目前仅有 WeatherServiceClient）。
+        if (StringUtils.hasText(context.userId())) {
             template.header(X_USER_ID, context.userId());
         }
-        if (context.tenantId() != null) {
+        if (StringUtils.hasText(context.tenantId())) {
             template.header(X_USER_TENANT, context.tenantId());
         }
     }

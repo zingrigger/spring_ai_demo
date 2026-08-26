@@ -32,7 +32,8 @@ public final class JwtTokenParser {
                     claims.get("userId", String.class),
                     claims.get("tenantId", String.class)));
         } catch (JwtException | IllegalArgumentException error) {
-            logger.warn("JWT 解析失败: {}", error.getMessage());
+            logger.warn("JWT 解析失败: {} - {}", error.getClass().getSimpleName(),
+                    error.getMessage() != null ? error.getMessage() : "(无错误信息)");
             return Optional.empty();
         }
     }

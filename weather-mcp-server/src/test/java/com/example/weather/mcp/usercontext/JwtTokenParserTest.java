@@ -53,6 +53,12 @@ class JwtTokenParserTest {
     }
 
     @Test
+    void returnsEmptyForNullOrEmptyToken() {
+        assertThat(parser.parse(null)).isEmpty();
+        assertThat(parser.parse("")).isEmpty();
+    }
+
+    @Test
     void allowsMissingClaims() {
         // jjwt 0.12.x omits the payload entirely when a token has no claims,
         // producing a degenerate "header..signature" token that jjwt itself

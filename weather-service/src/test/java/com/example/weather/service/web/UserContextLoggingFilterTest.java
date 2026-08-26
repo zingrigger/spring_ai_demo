@@ -58,5 +58,18 @@ class UserContextLoggingFilterTest {
         new UserContextLoggingFilter().doFilter(request, response, filterChain);
 
         assertThat(appender.list).isEmpty();
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void doesNotLogBlankUserId() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-User-Id", "");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        new UserContextLoggingFilter().doFilter(request, response, filterChain);
+
+        assertThat(appender.list).isEmpty();
+        verify(filterChain).doFilter(request, response);
     }
 }

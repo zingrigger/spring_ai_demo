@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -29,6 +30,10 @@ public final class UserContextExtractionFilter extends OncePerRequestFilter {
 
     public UserContextExtractionFilter(@Value("${user-context.source}") String source,
                                        JwtTokenParser jwtTokenParser) {
+        if (!"bearer-token".equals(source) && !"explicit-headers".equals(source)) {
+            throw new IllegalArgumentException(
+                    "不支持的 user-context.source: '" + source + "'（仅支持 bearer-token 或 explicit-headers）");
+        }
         this.source = source;
         this.jwtTokenParser = jwtTokenParser;
     }
@@ -50,21 +55,24 @@ public final class UserContextExtractionFilter extends OncePerRequestFilter {
 
     private void extractFromBearerToken(HttpServletRequest request) {
         String authorization = request.getHeader(AUTHORIZATION_HEADER);
-        if (authorization == null || !authorization.startsWith(BEARER_PREFIX)) {
+        if (authorization == null
+                || !authorization.regionMatches(true, 0, BEARER_PREFIX, 0, BEARER_PREFIX.length())) {
             logger.debug("请求缺少 Authorization Bearer 头，跳过用户上下文提取");
             return;
         }
-        jwtTokenParser.parse(authorization.substring(BEARER_PREFIX.length()))
+        jwtTokenParser.parse(authorization.substring(BEARER_PREFIX.length()).strip())
                 .ifPresent(UserContextHolder::set);
     }
 
     private void extractFromExplicitHeaders(HttpServletRequest request) {
         String userId = request.getHeader(X_USER_ID);
         String tenantId = request.getHeader(X_USER_TENANT);
-        if (userId == null && tenantId == null) {
+        boolean hasUserId = StringUtils.hasText(userId);
+        boolean hasTenantId = StringUtils.hasText(tenantId);
+        if (!hasUserId && !hasTenantId) {
             logger.debug("请求缺少 X-User-Id/X-User-Tenant 头，跳过用户上下文提取");
             return;
         }
-        UserContextHolder.set(new UserContext(userId, tenantId));
+        UserContextHolder.set(new UserContext(hasUserId ? userId : null, hasTenantId ? tenantId : null));
     }
 }

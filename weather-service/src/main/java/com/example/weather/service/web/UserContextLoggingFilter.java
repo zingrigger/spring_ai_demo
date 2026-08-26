@@ -7,6 +7,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -23,7 +24,7 @@ public final class UserContextLoggingFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String userId = request.getHeader(X_USER_ID);
         String tenantId = request.getHeader(X_USER_TENANT);
-        if (userId != null || tenantId != null) {
+        if (StringUtils.hasText(userId) || StringUtils.hasText(tenantId)) {
             logger.info("收到用户上下文: X-User-Id={}, X-User-Tenant={}", userId, tenantId);
         }
         filterChain.doFilter(request, response);

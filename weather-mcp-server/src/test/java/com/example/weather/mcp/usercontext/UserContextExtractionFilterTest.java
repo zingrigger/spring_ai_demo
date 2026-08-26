@@ -13,7 +13,9 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -64,6 +66,16 @@ class UserContextExtractionFilterTest {
         new UserContextExtractionFilter("bearer-token", tokenParser)
                 .doFilter(request, response, filterChain);
         assertThat(UserContextHolder.get()).isNull();
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void bearerModeLeavesHolderEmptyForMalformedToken() throws Exception {
+        request.addHeader("Authorization", "Bearer not-a-jwt");
+        new UserContextExtractionFilter("bearer-token", tokenParser)
+                .doFilter(request, response, filterChain);
+        assertThat(UserContextHolder.get()).isNull();
+        verify(filterChain).doFilter(request, response);
     }
 
     @Test
@@ -76,6 +88,7 @@ class UserContextExtractionFilterTest {
         }).when(filterChain).doFilter(request, response);
         new UserContextExtractionFilter("explicit-headers", tokenParser)
                 .doFilter(request, response, filterChain);
+        verify(filterChain).doFilter(request, response);
     }
 
     @Test
@@ -83,6 +96,19 @@ class UserContextExtractionFilterTest {
         new UserContextExtractionFilter("explicit-headers", tokenParser)
                 .doFilter(request, response, filterChain);
         assertThat(UserContextHolder.get()).isNull();
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void explicitModeTreatsBlankHeadersAsMissing() throws Exception {
+        request.addHeader("X-User-Id", "");
+        doAnswer(invocation -> {
+            assertThat(UserContextHolder.get()).isNull();
+            return null;
+        }).when(filterChain).doFilter(request, response);
+        new UserContextExtractionFilter("explicit-headers", tokenParser)
+                .doFilter(request, response, filterChain);
+        verify(filterChain).doFilter(request, response);
     }
 
     @Test
@@ -90,6 +116,18 @@ class UserContextExtractionFilterTest {
         request.addHeader("Authorization", "Bearer " + validToken());
         new UserContextExtractionFilter("bearer-token", tokenParser)
                 .doFilter(request, response, filterChain);
+        assertThat(UserContextHolder.get()).isNull();
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void clearsHolderWhenChainThrows() throws Exception {
+        request.addHeader("Authorization", "Bearer " + validToken());
+        RuntimeException failure = new RuntimeException("chain failed");
+        doThrow(failure).when(filterChain).doFilter(request, response);
+        assertThatThrownBy(() -> new UserContextExtractionFilter("bearer-token", tokenParser)
+                .doFilter(request, response, filterChain))
+                .isSameAs(failure);
         assertThat(UserContextHolder.get()).isNull();
     }
 }
