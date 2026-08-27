@@ -4,6 +4,7 @@ import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -17,6 +18,23 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    /**
+     * Serves the RFC 9728 protected-resource metadata from the MVC controller
+     * (ProtectedResourceMetadataController). This chain matches only the metadata
+     * path and is evaluated before the main chain so that the resource server's
+     * built-in OAuth2ProtectedResourceMetadataFilter does not shadow the controller
+     * with an incomplete response (it omits {@code authorization_servers}).
+     * The endpoint stays public (permitAll); /mcp rules are untouched.
+     */
+    @Bean
+    @Order(1)
+    SecurityFilterChain protectedResourceMetadataSecurityFilterChain(HttpSecurity http) throws Exception {
+        return http
+                .securityMatcher("/.well-known/oauth-protected-resource")
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .build();
+    }
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
