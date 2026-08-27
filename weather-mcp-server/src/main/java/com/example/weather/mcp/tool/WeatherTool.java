@@ -8,10 +8,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Component;
 
 @Component
-public final class WeatherTool {
+public class WeatherTool {
 
     private static final Logger logger = LoggerFactory.getLogger(WeatherTool.class);
     private static final String SERVICE_UNAVAILABLE = "天气服务暂时不可用，请稍后重试";
@@ -22,6 +23,7 @@ public final class WeatherTool {
         this.weatherServiceClient = weatherServiceClient;
     }
 
+    @PreAuthorize("hasAuthority('SCOPE_weather:read')")
     @Tool(name = "get_weather_by_city", description = "查询指定城市的当前天气")
     public WeatherToolResult getWeatherByCity(
             @ToolParam(description = "城市名称，例如北京或 Beijing") String city) {
