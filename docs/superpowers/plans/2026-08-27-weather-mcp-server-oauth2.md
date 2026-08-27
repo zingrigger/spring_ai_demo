@@ -601,13 +601,27 @@ curl --silent --show-error \
 > 或改用外部授权服务器（届时 MCP Server 仅保留资源服务器角色）。
 ```
 
-- [ ] **Step 2: 检查 README 无残留「不做 MCP 认证」表述**
+- [ ] **Step 2: 更新 README 底部「Security Notice」**
+
+把 `## Security Notice` 下的「This demo does not implement MCP authentication. Do not expose `/mcp` directly to the public internet. A production deployment must add TLS, authentication, authorization, and network access controls in the application or an upstream gateway.」改为：
+
+```markdown
+## Security Notice
+
+This demo enables MCP OAuth 2.1 authentication on `/mcp` (see above) but does **not**
+enable TLS in the demo profile. Do not expose `/mcp` directly to the public internet
+without TLS. A production deployment must enable TLS, externalize the OAuth client
+secret (or replace the embedded authorization server with an external IdP), and add
+network access controls in the application or an upstream gateway.
+```
+
+- [ ] **Step 3: 检查 README 无残留「不做 MCP 认证」表述**
 
 ```bash
 grep -n "不做 MCP 认证" README.md || echo "clean"
 ```
 
-- [ ] **Step 3: 提交**
+- [ ] **Step 4: 提交**
 
 ```bash
 git add README.md
