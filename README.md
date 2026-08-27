@@ -54,6 +54,51 @@ Expected fields are `city`, `condition`, `temperatureCelsius`, `feelsLikeCelsius
 
 Supported cities are 北京/Beijing, 上海/Shanghai, 广州/Guangzhou, 深圳/Shenzhen, and 杭州/Hangzhou.
 
+## OAuth 2.1 认证（内嵌授权服务器）
+
+`weather-mcp-server` 使用 MCP 规范的 OAuth 2.1 认证：内嵌 Spring Authorization Server 签发 JWT，
+并对 `/mcp` 端点做资源服务器校验，要求 `scope=weather:read`。
+
+- 授权端点：
+  - Token：`POST http://localhost:8081/oauth2/token`
+  - 授权：`GET http://localhost:8081/oauth2/authorize`
+  - JWKS：`GET http://localhost:8081/oauth2/jwks`
+  - 发现：`GET http://localhost:8081/.well-known/oauth-authorization-server`
+- 受保护资源元数据：`GET http://localhost:8081/.well-known/oauth-protected-resource`
+
+### 客户端
+
+| 客户端 | 流程 | 配置 |
+| --- | --- | --- |
+| `weather-mcp-public` | 授权码 + PKCE（公钥客户端，无 secret） | `redirect-uri: http://127.0.0.1:5173/callback` |
+| `weather-mcp-machine` | client_credentials | `weather-mcp-machine:demo-secret` |
+
+### 用 client_credentials 取 token 并调用工具
+
+```bash
+ACCESS_TOKEN=$(curl -s -XPOST http://localhost:8081/oauth2/token \
+  --user weather-mcp-machine:demo-secret \
+  -d grant_type=client_credentials -d scope=weather:read | jq -r .access_token)
+
+curl --silent --show-error \
+  -X POST http://localhost:8081/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H "Authorization: Bearer $ACCESS_TOKEN" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_weather_by_city","arguments":{"city":"北京"}}}'
+```
+
+不带 token 调用会返回 `401`，并带 `WWW-Authenticate: Bearer resource_metadata="...", scope="weather:read"` 挑战头。
+
+### 用 MCP Inspector 走授权码 + PKCE
+
+在 MCP Inspector 中选择 Streamable HTTP，填入 `http://localhost:8081/mcp`，跟随其内建 OAuth 流程
+（使用的客户端为 `weather-mcp-public`）。首次会跳转本机授权页并回调到 `http://127.0.0.1:5173/callback`。
+
+> 安全提醒：`client-secret`（`demo-secret`）与 `{noop}` 仅为本地演示。真实部署必须启用 TLS，
+> 通过环境变量覆盖 `spring.security.oauth2.authorizationserver.client.weather-mcp-machine.registration.client-secret`，
+> 或改用外部授权服务器（届时 MCP Server 仅保留资源服务器角色）。
+
 ## Connect an MCP Client
 
 完整测试步骤（包括不接入 Agent 的直连测试和接入外部 Agent 的测试）见 [WeatherTool 测试说明](docs/weather-tool-testing.md)。
@@ -90,4 +135,8 @@ Querying an unsupported city returns a sanitized tool error. If no Weather Servi
 
 ## Security Notice
 
-This demo does not implement MCP authentication. Do not expose `/mcp` directly to the public internet. A production deployment must add TLS, authentication, authorization, and network access controls in the application or an upstream gateway.
+This demo enables MCP OAuth 2.1 authentication on `/mcp` (see above) but does **not**
+enable TLS in the demo profile. Do not expose `/mcp` directly to the public internet
+without TLS. A production deployment must enable TLS, externalize the OAuth client
+secret (or replace the embedded authorization server with an external IdP), and add
+network access controls in the application or an upstream gateway.
