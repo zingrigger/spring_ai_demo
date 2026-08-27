@@ -327,12 +327,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -364,18 +364,18 @@ class McpSecurityFilterTest {
     }
 
     @Test
+    @WithMockUser(authorities = "ROLE_OTHER")
     void forbiddenWithoutRequiredScope() throws Exception {
         mvc.perform(post("/mcp")
-                        .with(user("client").authorities("ROLE_OTHER"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(INITIALIZE))
                 .andExpect(status().isForbidden());
     }
 
     @Test
+    @WithMockUser(authorities = "SCOPE_weather:read")
     void allowedWithRequiredScope() throws Exception {
         mvc.perform(post("/mcp")
-                        .with(user("client").authorities("SCOPE_weather:read"))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(INITIALIZE))
                 .andExpect(status().isOk());
