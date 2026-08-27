@@ -19,6 +19,27 @@ spring:
           weather-service:
             connectTimeout: 2000
             readTimeout: 3000
+  security:
+    oauth2:
+      authorizationserver:
+        client:
+          weather-mcp-public:
+            registration:
+              client-id: weather-mcp-public
+              client-name: Weather MCP Public Client
+              client-authentication-methods: none
+              authorization-grant-types: authorization_code, refresh_token
+              redirect-uris:
+                - http://127.0.0.1:5173/callback
+              scopes: [weather:read]
+              require-authorization-consent: false
+          weather-mcp-machine:
+            registration:
+              client-id: weather-mcp-machine
+              client-secret: "{noop}demo-secret"
+              client-authentication-methods: client_secret_basic
+              authorization-grant-types: client_credentials
+              scopes: [weather:read]
 
 eureka:
   client:
