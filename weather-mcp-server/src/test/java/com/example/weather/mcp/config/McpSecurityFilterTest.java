@@ -1,15 +1,24 @@
 package com.example.weather.mcp.config;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.nimbusds.jose.jwk.source.JWKSource;
+import com.nimbusds.jose.proc.SecurityContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -32,6 +41,9 @@ class McpSecurityFilterTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private JWKSource<SecurityContext> jwkSource;
 
     private static final String INITIALIZE =
             "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2024-11-05\",\"capabilities\":{},\"clientInfo\":{\"name\":\"test\",\"version\":\"1.0\"}}}";
@@ -76,6 +88,34 @@ class McpSecurityFilterTest {
                         .content(INITIALIZE))
                 .andExpect(status().is(not(401)))
                 .andExpect(status().is(not(403)));
+    }
+
+    /**
+     * Proves the resource-server JwtDecoder enforces token timestamps: a token
+     * signed with the AS's own key but whose {@code exp} is in the past must be
+     * rejected with 401 instead of being accepted forever (the default decoder
+     * from OAuth2AuthorizationServerConfiguration only checks the signature).
+     */
+    @Test
+    void rejectsExpiredAccessToken() throws Exception {
+        Instant now = Instant.now();
+        JwtClaimsSet claims = JwtClaimsSet.builder()
+                .issuer("http://localhost:8081")
+                .issuedAt(now.minusSeconds(3600))
+                .expiresAt(now.minusSeconds(60))
+                .subject("weather-mcp-machine")
+                .claim("client_id", "weather-mcp-machine")
+                .claim("scope", "weather:read")
+                .build();
+        JwsHeader header = JwsHeader.with(SignatureAlgorithm.RS256).build();
+        Jwt token = new NimbusJwtEncoder(jwkSource)
+                .encode(JwtEncoderParameters.from(header, claims));
+
+        mvc.perform(post("/mcp")
+                        .header("Authorization", "Bearer " + token.getTokenValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(INITIALIZE))
+                .andExpect(status().isUnauthorized());
     }
 
     private String obtainAccessToken() throws Exception {

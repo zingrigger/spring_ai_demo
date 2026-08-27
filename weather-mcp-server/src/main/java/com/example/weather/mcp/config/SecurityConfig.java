@@ -10,8 +10,14 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.OAuth2AuthorizationServerConfiguration;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidators;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
+import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -40,9 +46,19 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
                 .oauth2AuthorizationServer(Customizer.withDefaults())
+                .formLogin(Customizer.withDefaults())
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/mcp"))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/mcp").hasAuthority("SCOPE_" + McpBearerAuthenticationEntryPoint.REQUIRED_SCOPE)
+                        // The AS endpoint filter runs after the authorization
+                        // rules, so the interactive authorize step must require
+                        // an authenticated principal here; otherwise anonymous
+                        // requests bounce back to the client with
+                        // error=invalid_request instead of reaching the login
+                        // page. The token endpoint stays permitAll so
+                        // client_credentials (and the code exchange) can
+                        // authenticate via the AS client-authentication filter.
+                        .requestMatchers("/oauth2/authorize").authenticated()
                         .anyRequest().permitAll())
                 .oauth2ResourceServer(resource -> resource
                         .authenticationEntryPoint(new McpBearerAuthenticationEntryPoint())
@@ -50,9 +66,31 @@ public class SecurityConfig {
                 .build();
     }
 
+    /**
+     * Local demo user so the interactive authorization_code + PKCE flow can
+     * actually complete: a browser hitting {@code /oauth2/authorize} is
+     * redirected to the form login page and can authenticate with these
+     * credentials. Demo-only; a real deployment should use a real identity
+     * provider or at least a hashed password.
+     */
+    @Bean
+    UserDetailsService userDetailsService() {
+        UserDetails demoUser = User.withUsername("demo")
+                .password("{noop}demo-password")
+                .roles("USER")
+                .build();
+        return new InMemoryUserDetailsManager(demoUser);
+    }
+
     @Bean
     JwtDecoder jwtDecoder(JWKSource<SecurityContext> jwkSource) {
-        return OAuth2AuthorizationServerConfiguration.jwtDecoder(jwkSource);
+        // The factory's default NimbusJwtDecoder validates only the JWS
+        // signature — its claims verifier is a no-op, so a leaked token would
+        // never expire. Replace it with the default timestamp validation
+        // (exp/nbf, plus typ/x5t checks) so expired tokens are rejected.
+        NimbusJwtDecoder decoder = (NimbusJwtDecoder) OAuth2AuthorizationServerConfiguration.jwtDecoder(jwkSource);
+        decoder.setJwtValidator(JwtValidators.createDefault());
+        return decoder;
     }
 
     @Bean

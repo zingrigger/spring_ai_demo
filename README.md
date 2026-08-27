@@ -96,8 +96,10 @@ curl --silent --show-error \
 （使用的客户端为 `weather-mcp-public`）。首次会跳转本机授权页并回调到 `http://127.0.0.1:5173/callback`。
 
 > 安全提醒：`client-secret`（`demo-secret`）与 `{noop}` 仅为本地演示。真实部署必须启用 TLS，
-> 通过环境变量覆盖 `spring.security.oauth2.authorizationserver.client.weather-mcp-machine.registration.client-secret`，
-> 或改用外部授权服务器（届时 MCP Server 仅保留资源服务器角色）。
+> 并用启动参数覆盖密钥（保留 `{noop}` 前缀），例如
+> `--spring.security.oauth2.authorizationserver.client.weather-mcp-machine.registration.client-secret='{noop}<实际密钥>'`
+> （注意：带连字符的键名不能通过环境变量覆盖——Spring 的宽松绑定会丢弃连字符），
+> 或改用密钥管理服务 / 外部授权服务器（届时 MCP Server 仅保留资源服务器角色）。
 
 ## Connect an MCP Client
 
