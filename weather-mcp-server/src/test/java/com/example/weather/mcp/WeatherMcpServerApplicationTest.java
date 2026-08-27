@@ -18,7 +18,7 @@ class WeatherMcpServerApplicationTest {
     @Test
     void loadsStreamableMcpConfiguration() {
         assertThat(environment.getProperty("spring.application.name")).isEqualTo("weather-mcp-server");
-        assertThat(environment.getProperty("spring.ai.mcp.server.protocol")).isEqualTo("STREAMABLE");
+        assertThat(environment.getProperty("spring.ai.mcp.server.protocol")).isEqualTo("STATELESS");
         assertThat(environment.getProperty("spring.ai.mcp.server.streamable-http.mcp-endpoint")).isEqualTo("/mcp");
     }
 }
