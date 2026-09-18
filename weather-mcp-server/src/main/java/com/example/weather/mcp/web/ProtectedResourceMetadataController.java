@@ -14,7 +14,7 @@ public class ProtectedResourceMetadataController {
     @GetMapping(value = "/.well-known/oauth-protected-resource", produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> protectedResourceMetadata() {
         return Map.of(
-                "resource", BASE_URL + "/mcp",
+                "resource", BASE_URL + "/",
                 "authorization_servers", List.of(BASE_URL));
     }
 }

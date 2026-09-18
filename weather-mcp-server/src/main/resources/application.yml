@@ -31,6 +31,8 @@ spring:
               authorization-grant-types: authorization_code, refresh_token
               redirect-uris:
                 - http://127.0.0.1:5173/callback
+                - http://${INSPECTOR_HOST:127.0.0.1}:6274/oauth/callback
+                - http://localhost:6274/oauth/callback
               scopes: [weather:read]
               require-authorization-consent: false
           weather-mcp-machine:

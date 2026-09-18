@@ -28,7 +28,7 @@ class ProtectedResourceMetadataControllerTest {
         mvc.perform(get("/.well-known/oauth-protected-resource")
                         .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resource").value("http://localhost:8081/mcp"))
+                .andExpect(jsonPath("$.resource").value("http://localhost:8081/"))
                 .andExpect(jsonPath("$.authorization_servers[0]").value("http://localhost:8081"));
     }
 }
