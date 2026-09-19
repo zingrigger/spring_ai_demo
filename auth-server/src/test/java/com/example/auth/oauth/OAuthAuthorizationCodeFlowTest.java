@@ -83,12 +83,8 @@ class OAuthAuthorizationCodeFlowTest {
     void rejectsAWrongCodeVerifier() throws Exception {
         String code = this.flow.authorize("alice", "alice-password", 10L, "openid");
 
-        this.mockMvc.perform(post("/oauth2/token")
-                        .param("grant_type", "authorization_code")
-                        .param("code", code)
-                        .param("redirect_uri", AuthorizationCodeFlow.REDIRECT_URI)
-                        .param("client_id", AuthorizationCodeFlow.CLIENT_ID)
-                        .param("code_verifier", "a-completely-different-verifier-1234567890"))
+        this.mockMvc.perform(AuthorizationCodeFlow.tokenExchange(
+                        code, AuthorizationCodeFlow.REDIRECT_URI, "a-completely-different-verifier-1234567890"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_grant"));
     }
@@ -99,12 +95,8 @@ class OAuthAuthorizationCodeFlowTest {
         String body = tokenRequest(code, AuthorizationCodeFlow.REDIRECT_URI, AuthorizationCodeFlow.VERIFIER);
         assertThat(body).contains("access_token");
 
-        this.mockMvc.perform(post("/oauth2/token")
-                        .param("grant_type", "authorization_code")
-                        .param("code", code)
-                        .param("redirect_uri", AuthorizationCodeFlow.REDIRECT_URI)
-                        .param("client_id", AuthorizationCodeFlow.CLIENT_ID)
-                        .param("code_verifier", AuthorizationCodeFlow.VERIFIER))
+        this.mockMvc.perform(AuthorizationCodeFlow.tokenExchange(
+                        code, AuthorizationCodeFlow.REDIRECT_URI, AuthorizationCodeFlow.VERIFIER))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_grant"));
     }
@@ -113,12 +105,8 @@ class OAuthAuthorizationCodeFlowTest {
     void rejectsAMismatchedRedirectUri() throws Exception {
         String code = this.flow.authorize("alice", "alice-password", 10L, "openid");
 
-        this.mockMvc.perform(post("/oauth2/token")
-                        .param("grant_type", "authorization_code")
-                        .param("code", code)
-                        .param("redirect_uri", "http://127.0.0.1:9999/not-registered")
-                        .param("client_id", AuthorizationCodeFlow.CLIENT_ID)
-                        .param("code_verifier", AuthorizationCodeFlow.VERIFIER))
+        this.mockMvc.perform(AuthorizationCodeFlow.tokenExchange(
+                        code, "http://127.0.0.1:9999/not-registered", AuthorizationCodeFlow.VERIFIER))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_grant"));
     }
@@ -139,12 +127,7 @@ class OAuthAuthorizationCodeFlowTest {
     }
 
     private String tokenRequest(String code, String redirectUri, String verifier) throws Exception {
-        return this.mockMvc.perform(post("/oauth2/token")
-                        .param("grant_type", "authorization_code")
-                        .param("code", code)
-                        .param("redirect_uri", redirectUri)
-                        .param("client_id", AuthorizationCodeFlow.CLIENT_ID)
-                        .param("code_verifier", verifier))
+        return this.mockMvc.perform(AuthorizationCodeFlow.tokenExchange(code, redirectUri, verifier))
                 .andExpect(status().isOk())
                 .andReturn()
                 .getResponse()

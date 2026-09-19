@@ -2,7 +2,8 @@ package com.example.auth.config;
 
 import com.example.auth.oidc.UserInfoService;
 import com.example.auth.security.OrganizationBindingFilter;
-import com.example.auth.token.RotatingRefreshTokenGenerator;
+import com.example.auth.token.AuthorizationTokenCustomizer;
+import com.example.auth.token.TokenClaimsCustomizer;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.context.annotation.Bean;
@@ -12,7 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
@@ -21,10 +22,9 @@ import org.springframework.security.oauth2.server.authorization.client.JdbcRegis
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings;
 import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator;
-import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext;
 import org.springframework.security.oauth2.server.authorization.token.JwtGenerator;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2AccessTokenGenerator;
-import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer;
+import org.springframework.security.oauth2.server.authorization.token.OAuth2RefreshTokenGenerator;
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.jackson.SecurityJacksonModules;
 import org.springframework.security.web.SecurityFilterChain;
@@ -71,8 +71,9 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    RegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate) {
-        return new JdbcRegisteredClientRepository(jdbcTemplate);
+    RegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate,
+                                                          AuthServerProperties properties) {
+        return new ConfiguredRegisteredClients(new JdbcRegisteredClientRepository(jdbcTemplate), properties);
     }
 
     @Bean
@@ -114,12 +115,16 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    OAuth2TokenGenerator<?> tokenGenerator(JWKSource<SecurityContext> jwkSource,
-                                           OAuth2TokenCustomizer<JwtEncodingContext> jwtCustomizer) {
-        JwtGenerator jwtGenerator = new JwtGenerator(new NimbusJwtEncoder(jwkSource));
-        jwtGenerator.setJwtCustomizer(jwtCustomizer);
+    OAuth2TokenGenerator<?> tokenGenerator(JwtEncoder jwtEncoder,
+                                           TokenClaimsCustomizer tokenClaimsCustomizer,
+                                           AuthorizationTokenCustomizer authorizationTokenCustomizer) {
+        JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
+        jwtGenerator.setJwtCustomizer((context) -> {
+            tokenClaimsCustomizer.customize(context);
+            authorizationTokenCustomizer.customize(context);
+        });
         OAuth2AccessTokenGenerator accessTokenGenerator = new OAuth2AccessTokenGenerator();
-        RotatingRefreshTokenGenerator refreshTokenGenerator = new RotatingRefreshTokenGenerator();
+        OAuth2RefreshTokenGenerator refreshTokenGenerator = new OAuth2RefreshTokenGenerator();
         return new DelegatingOAuth2TokenGenerator(jwtGenerator, accessTokenGenerator, refreshTokenGenerator);
     }
 

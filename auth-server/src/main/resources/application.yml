@@ -1,5 +1,9 @@
 server:
   port: 8083
+  servlet:
+    session:
+      # Session idle timeout follows the configured OAuth lifetime.
+      timeout: ${auth.oauth.session-idle-timeout}
 
 spring:
   application:

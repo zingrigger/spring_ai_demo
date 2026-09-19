@@ -1,8 +1,12 @@
 -- Local development clients. Production clients are added by operations SQL and
 -- their plaintext secrets are injected at deploy time, never committed here.
 --
--- auth-web-public : public browser/SPA client, Authorization Code + PKCE, refresh tokens.
+-- auth-web-public : user-facing web client, Authorization Code + PKCE + refresh tokens.
+--                   The client id is historical: refresh tokens require client
+--                   authentication in Spring Authorization Server, so this client is
+--                   registered as confidential. Local plaintext: auth-web-secret.
 -- auth-machine    : confidential machine client, Client Credentials only.
+--                   Local plaintext: auth-machine-secret.
 --
 -- client_settings / token_settings are the exact Jackson documents written by
 -- JdbcRegisteredClientRepository (spring-security-oauth2-authorization-server 7.0.7).
@@ -14,11 +18,11 @@ INSERT INTO oauth2_registered_client (
 VALUES
     ('6f0d1d0e-3a4a-4c1f-9d02-9f1d0f5a1a01',
      'auth-web-public',
-     CURRENT_TIMESTAMP,
-     NULL,
+    CURRENT_TIMESTAMP,
+     '{bcrypt}$2a$10$cvhjb1fQ9lqZ.GUeEU3YoO/xBumad.OL8RyMfTkH2CyHevaifVsUa',
      NULL,
      'Auth Web Client',
-     'none',
+     'client_secret_basic',
      'refresh_token,authorization_code',
      'http://127.0.0.1:8080/login/oauth2/code/auth-server,http://localhost:8080/login/oauth2/code/auth-server',
      NULL,

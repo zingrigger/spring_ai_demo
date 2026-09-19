@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.httpBasic;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -31,6 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 public final class AuthorizationCodeFlow {
 
     public static final String CLIENT_ID = "auth-web-public";
+    public static final String CLIENT_SECRET = "auth-web-secret";
     public static final String REDIRECT_URI = "http://127.0.0.1:8080/login/oauth2/code/auth-server";
     public static final String STATE = "test-state";
     public static final String VERIFIER = "0123456789012345678901234567890123456789012";
@@ -48,15 +50,36 @@ public final class AuthorizationCodeFlow {
     public JsonNode authorizeAndExchangeTokens(String account, String password, long orgId, String scope)
             throws Exception {
         String code = authorize(account, password, orgId, scope);
-        MvcResult tokens = this.mockMvc.perform(post("/oauth2/token")
-                        .param("grant_type", "authorization_code")
-                        .param("code", code)
-                        .param("redirect_uri", REDIRECT_URI)
-                        .param("client_id", CLIENT_ID)
-                        .param("code_verifier", VERIFIER))
+        MvcResult tokens = this.mockMvc.perform(tokenExchange(code, REDIRECT_URI, VERIFIER))
                 .andExpect(status().isOk())
                 .andReturn();
         return this.objectMapper.readTree(tokens.getResponse().getContentAsString());
+    }
+
+    /**
+     * Token exchange for the user-facing client: the client authenticates with
+     * its secret while PKCE stays enforced on top.
+     */
+    public static MockHttpServletRequestBuilder tokenExchange(String code, String redirectUri, String verifier) {
+        return post("/oauth2/token")
+                .with(httpBasic(CLIENT_ID, CLIENT_SECRET))
+                .param("grant_type", "authorization_code")
+                .param("code", code)
+                .param("redirect_uri", redirectUri)
+                .param("code_verifier", verifier);
+    }
+
+    public static MockHttpServletRequestBuilder refresh(String refreshToken) {
+        return post("/oauth2/token")
+                .with(httpBasic(CLIENT_ID, CLIENT_SECRET))
+                .param("grant_type", "refresh_token")
+                .param("refresh_token", refreshToken);
+    }
+
+    public static MockHttpServletRequestBuilder revoke(String token) {
+        return post("/oauth2/revoke")
+                .with(httpBasic(CLIENT_ID, CLIENT_SECRET))
+                .param("token", token);
     }
 
     /**
