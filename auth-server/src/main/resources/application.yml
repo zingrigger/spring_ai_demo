@@ -5,7 +5,7 @@ spring:
   application:
     name: auth-server
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/auth}
+    url: ${DB_URL:jdbc:mysql://localhost:3306/auth?preserveInstants=true&connectionTimeZone=UTC&forceConnectionTimeZoneToSession=true}
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
@@ -17,6 +17,9 @@ auth:
     password: ${AUTH_KEYSTORE_PASSWORD:}
     type: ${AUTH_KEYSTORE_TYPE:PKCS12}
     alias: ${AUTH_KEYSTORE_ALIAS:}
-  token:
-    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:PT15M}
-    refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:P7D}
+  oauth:
+    authorization-code-ttl: ${AUTH_AUTHORIZATION_CODE_TTL:PT5M}
+    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:PT10M}
+    id-token-ttl: ${AUTH_ID_TOKEN_TTL:PT10M}
+    refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:P30D}
+    session-idle-timeout: ${AUTH_SESSION_IDLE_TIMEOUT:PT30M}
