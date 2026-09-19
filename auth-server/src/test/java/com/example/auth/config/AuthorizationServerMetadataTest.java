@@ -84,6 +84,15 @@ class AuthorizationServerMetadataTest {
     }
 
     @Test
+    void exposesOnlyAHealthStatus() throws Exception {
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"))
+                .andExpect(jsonPath("$.components").doesNotExist())
+                .andExpect(jsonPath("$.details").doesNotExist());
+    }
+
+    @Test
     void loadsSeededClientsThroughJdbcRegisteredClientRepository() {
         RegisteredClient webClient = registeredClientRepository.findByClientId("auth-web-public");
         assertThat(webClient).isNotNull();

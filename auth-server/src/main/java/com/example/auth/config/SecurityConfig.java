@@ -31,7 +31,7 @@ public class SecurityConfig {
         http.securityContext((securityContext) -> securityContext
                 .securityContextRepository(securityContextRepository));
         http.authorizeHttpRequests((authorize) -> authorize
-                .requestMatchers("/login", "/error").permitAll()
+                .requestMatchers("/login", "/error", "/actuator/health").permitAll()
                 .anyRequest().authenticated());
         http.formLogin((formLogin) -> formLogin
                 .loginPage("/login")

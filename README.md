@@ -6,6 +6,7 @@ This project demonstrates an external AI Agent calling a Spring AI MCP Server ov
 
 - `weather-service` — simulated weather REST API on port `8082`
 - `weather-mcp-server` — Streamable HTTP MCP Server on port `8081`
+- `auth-server` — OAuth 2.1 / OIDC authorization server on port `8083`
 
 An AI Agent, MCP Client, and Eureka Server are intentionally not included.
 
@@ -134,6 +135,22 @@ Querying an unsupported city returns a sanitized tool error. If no Weather Servi
 
 - `http://localhost:8081/actuator/health`
 - `http://localhost:8082/actuator/health`
+
+## auth-server（独立 OAuth 2.1 / OIDC 授权服务器）
+
+`auth-server` 是独立的授权服务器：基于现有 `sys_*` 只读表做 BCrypt 认证与组织级角色绑定，
+用 Flyway 管理自己的 `oauth2_*` 表，支持 Authorization Code + PKCE、Refresh Token 轮换、
+Client Credentials、OIDC Discovery / ID Token / UserInfo / JWKS，签名密钥来自外部
+PKCS#12/JKS。
+
+- 模块说明、配置与本地运行步骤：[auth-server/README.md](auth-server/README.md)
+- 测试、smoke 脚本与验收步骤：[docs/auth-server-testing.md](docs/auth-server-testing.md)
+
+快速验收（服务已在 `8083` 启动）：
+
+```bash
+scripts/auth-server-smoke.sh
+```
 
 ## Security Notice
 

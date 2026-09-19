@@ -1,5 +1,9 @@
 # Test-only signing key: a self-signed 2048-bit RSA key generated for tests.
 # It is not a production secret and must never be reused outside tests.
+#
+# The profile deliberately points the datasource at an unreachable port: every
+# test context gets its DataSource from a MySQL 8 Testcontainer through
+# @ServiceConnection, so a test can never touch a real database.
 auth:
   issuer: http://localhost:8083
   keystore:
@@ -7,3 +11,7 @@ auth:
     password: changeit
     type: PKCS12
     alias: auth-server-test
+
+spring:
+  datasource:
+    url: jdbc:mysql://127.0.0.1:1/auth-server-test-must-use-testcontainers?connectTimeout=500
