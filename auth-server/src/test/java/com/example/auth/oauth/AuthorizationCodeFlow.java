@@ -12,11 +12,9 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -96,7 +94,7 @@ public final class AuthorizationCodeFlow {
             location = authorization.getResponse().getRedirectedUrl();
         }
         else {
-            location = submitConsent(session, consentPageHtml(session, authorization));
+            location = submitConsent(session, consentPayload(session, authorization));
         }
         assertThat(location).startsWith(REDIRECT_URI);
         assertThat(queryParameter(location, "state")).isEqualTo(STATE);
@@ -104,13 +102,31 @@ public final class AuthorizationCodeFlow {
     }
 
     /**
-     * Returns the rendered authorization confirmation page for the given request.
+     * 返回 consent 数据接口的 JSON 载荷（含客户端名称、scopes、state）。
      */
-    public String consentPage(String account, String password, long orgId, String scope) throws Exception {
+    public JsonNode consentPayload(String account, String password, long orgId, String scope) throws Exception {
         MockHttpSession session = loginAndSelectOrganization(account, password, orgId, scope);
         MvcResult authorization = this.mockMvc.perform(authorizeRequest(scope, VERIFIER).session(session))
                 .andReturn();
-        return consentPageHtml(session, authorization);
+        return consentPayload(session, authorization);
+    }
+
+    private JsonNode consentPayload(MockHttpSession session, MvcResult authorization) throws Exception {
+        String location = authorization.getResponse().getRedirectedUrl();
+        assertThat(location).as("authorization endpoint did not redirect to the consent page").isNotNull();
+        assertThat(java.net.URI.create(location).getPath()).isEqualTo("/consent");
+        Map<String, List<String>> parameters = queryParameters(location);
+
+        MockHttpServletRequestBuilder request = get("/api/consent").session(session)
+                .param("client_id", parameters.get("client_id").getFirst());
+        parameters.getOrDefault("scope", List.of()).forEach((scope) -> request.param("scope", scope));
+        if (parameters.containsKey("state")) {
+            request.param("state", parameters.get("state").getFirst());
+        }
+        MvcResult result = this.mockMvc.perform(request)
+                .andExpect(status().isOk())
+                .andReturn();
+        return this.objectMapper.readTree(result.getResponse().getContentAsString());
     }
 
     private MockHttpSession loginAndSelectOrganization(String account, String password, long orgId, String scope)
@@ -121,38 +137,22 @@ public final class AuthorizationCodeFlow {
         MockHttpSession session = (MockHttpSession) start.getRequest().getSession(false);
         assertThat(session).isNotNull();
 
-        this.mockMvc.perform(post("/login").session(session).with(csrf())
-                        .param("username", account)
-                        .param("password", password))
-                .andExpect(status().is3xxRedirection());
+        this.mockMvc.perform(post("/api/auth/login").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"account\":\"" + account + "\",\"password\":\"" + password + "\"}"))
+                .andExpect(status().isOk());
 
-        this.mockMvc.perform(post("/organizations").session(session).with(csrf())
-                        .param("orgId", String.valueOf(orgId)))
-                .andExpect(status().is3xxRedirection());
-        return session;
-    }
-
-    /**
-     * The authorization endpoint either renders the consent page inline or
-     * redirects to the configured {@code /oauth2/consent} page; the redirect is
-     * followed here with the query parameters decoded.
-     */
-    private String consentPageHtml(MockHttpSession session, MvcResult authorization) throws Exception {
-        if (authorization.getResponse().getStatus() == 200) {
-            return authorization.getResponse().getContentAsString();
-        }
-        String location = authorization.getResponse().getRedirectedUrl();
-        assertThat(location).as("authorization endpoint did not render or redirect to a consent page").isNotNull();
-
-        MockHttpServletRequestBuilder request = get(location.startsWith("http://")
-                ? java.net.URI.create(location).getPath()
-                : location.substring(0, location.indexOf('?') > 0 ? location.indexOf('?') : location.length()));
-        queryParameters(location).forEach((name, value) -> request.param(name, value));
-        return this.mockMvc.perform(request.session(session))
+        MvcResult organizations = this.mockMvc.perform(get("/api/organizations").session(session))
                 .andExpect(status().isOk())
-                .andReturn()
-                .getResponse()
-                .getContentAsString();
+                .andReturn();
+        JsonNode payload = this.objectMapper.readTree(organizations.getResponse().getContentAsString());
+        if (payload.path("next").isNull() || payload.path("next").isMissingNode()) {
+            this.mockMvc.perform(post("/api/organizations").session(session).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"orgId\":" + orgId + "}"))
+                    .andExpect(status().isOk());
+        }
+        return session;
     }
 
     private static boolean isClientRedirect(MvcResult authorization) {
@@ -162,47 +162,27 @@ public final class AuthorizationCodeFlow {
                 && location.startsWith(REDIRECT_URI);
     }
 
-    private static java.util.Map<String, String> queryParameters(String url) {
-        java.util.Map<String, String> decoded = new java.util.LinkedHashMap<>();
+    private static Map<String, List<String>> queryParameters(String url) {
+        Map<String, List<String>> decoded = new java.util.LinkedHashMap<>();
         UriComponentsBuilder.fromUriString(url).build().getQueryParams().forEach(
-                (name, values) -> decoded.put(name, java.net.URLDecoder.decode(values.getFirst(), StandardCharsets.UTF_8)));
+                (name, values) -> decoded.put(name, values.stream()
+                        .map((value) -> java.net.URLDecoder.decode(value, StandardCharsets.UTF_8))
+                        .toList()));
         return decoded;
     }
 
-    private String submitConsent(MockHttpSession session, String consentHtml) throws Exception {
-        return this.mockMvc.perform(post("/oauth2/authorize").session(session)
-                        .param("client_id", CLIENT_ID)
-                        .param("state", hiddenField(consentHtml, "state"))
-                        .param("scope", scopesOf(consentHtml).toArray(String[]::new)))
+    private String submitConsent(MockHttpSession session, JsonNode consent) throws Exception {
+        MockHttpServletRequestBuilder request = post("/oauth2/authorize").session(session)
+                .param("client_id", consent.path("clientId").asText());
+        if (consent.hasNonNull("state")) {
+            request.param("state", consent.path("state").asText());
+        }
+        consent.path("scopes").forEach((scope) -> request.param("scope", scope.asText()));
+        return this.mockMvc.perform(request)
                 .andExpect(status().is3xxRedirection())
                 .andReturn()
                 .getResponse()
                 .getRedirectedUrl();
-    }
-
-    private static String hiddenField(String html, String name) {
-        return inputValues(html, name).stream().findFirst()
-                .orElseThrow(() -> new AssertionError("authorization page does not expose field " + name));
-    }
-
-    private static List<String> scopesOf(String html) {
-        return inputValues(html, "scope");
-    }
-
-    private static List<String> inputValues(String html, String name) {
-        Pattern inputTag = Pattern.compile("<input\\b[^>]*>", Pattern.CASE_INSENSITIVE);
-        Pattern nameAttribute = Pattern.compile("name=\"" + Pattern.quote(name) + "\"");
-        Pattern valueAttribute = Pattern.compile("value=\"([^\"]*)\"");
-        List<String> values = new ArrayList<>();
-        Matcher inputs = inputTag.matcher(html);
-        while (inputs.find()) {
-            String tag = inputs.group();
-            Matcher value = valueAttribute.matcher(tag);
-            if (nameAttribute.matcher(tag).find() && value.find()) {
-                values.add(value.group(1));
-            }
-        }
-        return values;
     }
 
     static MockHttpServletRequestBuilder authorizeRequest(String scope, String verifier) throws Exception {

@@ -17,6 +17,9 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.mysql.MySQLContainer;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.ACCEPT;
 import static org.springframework.http.MediaType.TEXT_HTML_VALUE;
@@ -83,9 +86,14 @@ class OAuthAuthorizationCodeFlowTest {
 
     @Test
     void consentPageShowsTheClientTheScopesAndTheOrganization() throws Exception {
-        String html = this.flow.consentPage("alice", "alice-password", 10L, "openid profile");
+        JsonNode consent = this.flow.consentPayload("alice", "alice-password", 10L, "openid profile");
 
-        assertThat(html).contains("Authorize access", "Auth Web Client", "profile", "Alpha");
+        assertThat(consent.path("clientName").asText()).isEqualTo("Auth Web Client");
+        assertThat(consent.path("organization").path("name").asText()).isEqualTo("Alpha");
+        assertThat(consent.path("user").path("account").asText()).isEqualTo("alice");
+        List<String> scopes = new ArrayList<>();
+        consent.path("scopes").forEach((scope) -> scopes.add(scope.asText()));
+        assertThat(scopes).containsExactly("profile");
     }
 
     @Test

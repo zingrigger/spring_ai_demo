@@ -62,7 +62,7 @@ public class AuthorizationServerConfig {
         http.oauth2AuthorizationServer((authorizationServer) -> {
             http.securityMatcher(authorizationServer.getEndpointsMatcher());
             authorizationServer.authorizationEndpoint(
-                    (authorizationEndpoint) -> authorizationEndpoint.consentPage("/oauth2/consent"));
+                    (authorizationEndpoint) -> authorizationEndpoint.consentPage("/consent"));
             authorizationServer.oidc((oidc) -> oidc.userInfoEndpoint(
                     (userInfo) -> userInfo.userInfoMapper(userInfoService::load)));
         });
