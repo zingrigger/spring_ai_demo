@@ -469,7 +469,7 @@ class OrganizationApiControllerTest {
         OrganizationAuthorization binding = binding(session);
         assertThat(binding).isNotNull();
         assertThat(binding.orgId()).isEqualTo(20L);
-        assertThat(binding.roles()).containsExactly("VIEWER");
+        assertThat(binding.roles()).containsExactly("AUDITOR");
     }
 
     @Test
@@ -483,7 +483,7 @@ class OrganizationApiControllerTest {
 
         OrganizationAuthorization binding = binding(session);
         assertThat(binding).isNotNull();
-        assertThat(binding.orgId()).isEqualTo(30L);
+        assertThat(binding.orgId()).isEqualTo(20L);
     }
 
     @Test
