@@ -990,6 +990,8 @@ git commit -m "feat: add consent JSON API"
 
 把 consent 相关方法替换为 JSON 版本（删除 `consentPageHtml`、`hiddenField`、`scopesOf`、`inputValues` 及 `Matcher`/`Pattern` 相关 import）：
 
+新增 `import java.util.Map;`（原文件用全限定名 `java.util.Map`，改用简单名后需要导入）。
+
 ```java
     /**
      * 返回 consent 数据接口的 JSON 载荷（含客户端名称、scopes、state）。
