@@ -1,5 +1,6 @@
 package com.example.auth.config;
 
+import com.example.auth.security.OrganizationBindingFilter;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.context.annotation.Bean;
@@ -26,6 +27,9 @@ import org.springframework.security.oauth2.server.authorization.token.OAuth2Toke
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenGenerator;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
+import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
+import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 
 import java.util.Set;
@@ -39,7 +43,13 @@ public class AuthorizationServerConfig {
 
     @Bean
     @Order(1)
-    SecurityFilterChain authorizationServerSecurityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain authorizationServerSecurityFilterChain(
+            HttpSecurity http, AuthorizationServerSettings authorizationServerSettings,
+            RequestCache requestCache, SecurityContextRepository securityContextRepository) throws Exception {
+        http.addFilterAfter(new OrganizationBindingFilter(authorizationServerSettings, requestCache),
+                SecurityContextHolderFilter.class);
+        http.securityContext((securityContext) -> securityContext
+                .securityContextRepository(securityContextRepository));
         http.oauth2AuthorizationServer((authorizationServer) -> {
             http.securityMatcher(authorizationServer.getEndpointsMatcher());
             authorizationServer.oidc(Customizer.withDefaults());
