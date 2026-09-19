@@ -11,7 +11,13 @@ import java.time.Duration;
  * inputs; nothing here falls back to a generated value.
  */
 @ConfigurationProperties(prefix = "auth")
-public record AuthServerProperties(String issuer, Keystore keystore, Oauth oauth) {
+public record AuthServerProperties(String issuer, Keystore keystore, Oauth oauth, Resources resources) {
+
+    public AuthServerProperties {
+        if (resources == null) {
+            resources = new Resources("http://localhost:8081/mcp");
+        }
+    }
 
     /**
      * External PKCS#12/JKS keystore holding the RSA key that signs tokens.
@@ -25,5 +31,13 @@ public record AuthServerProperties(String issuer, Keystore keystore, Oauth oauth
      */
     public record Oauth(Duration authorizationCodeTtl, Duration accessTokenTtl, Duration idTokenTtl,
                         Duration refreshTokenTtl, Duration sessionIdleTimeout) {
+    }
+
+    /**
+     * Resource identifiers that tokens are audience-bound to (RFC 9068). The
+     * weather MCP server validates that {@code aud} matches its own resource
+     * identifier.
+     */
+    public record Resources(String weatherMcp) {
     }
 }

@@ -8,15 +8,19 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 
 public final class McpBearerAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
-    static final String RESOURCE_METADATA_URL = "http://localhost:8081/.well-known/oauth-protected-resource";
-    static final String REQUIRED_SCOPE = "weather:read";
+    private final WeatherMcpProperties properties;
+
+    public McpBearerAuthenticationEntryPoint(WeatherMcpProperties properties) {
+        this.properties = properties;
+    }
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
                          AuthenticationException authException) throws java.io.IOException {
         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
         response.setHeader("WWW-Authenticate",
-                "Bearer resource_metadata=\"" + RESOURCE_METADATA_URL + "\", scope=\"" + REQUIRED_SCOPE + "\"");
+                "Bearer resource_metadata=\"" + this.properties.protectedResourceMetadataUrl()
+                        + "\", scope=\"" + this.properties.requiredScope() + "\"");
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.getWriter().write("{\"error\":\"unauthorized\"}");
     }

@@ -19,29 +19,15 @@ spring:
           weather-service:
             connectTimeout: 2000
             readTimeout: 3000
-  security:
-    oauth2:
-      authorizationserver:
-        client:
-          weather-mcp-public:
-            registration:
-              client-id: weather-mcp-public
-              client-name: Weather MCP Public Client
-              client-authentication-methods: none
-              authorization-grant-types: authorization_code, refresh_token
-              redirect-uris:
-                - http://127.0.0.1:5173/callback
-                - http://${INSPECTOR_HOST:127.0.0.1}:6274/oauth/callback
-                - http://localhost:6274/oauth/callback
-              scopes: [weather:read]
-              require-authorization-consent: false
-          weather-mcp-machine:
-            registration:
-              client-id: weather-mcp-machine
-              client-secret: "{noop}demo-secret"
-              client-authentication-methods: client_secret_basic
-              authorization-grant-types: client_credentials
-              scopes: [weather:read]
+
+# This MCP server is an OAuth 2.1 resource server only. Tokens are issued by
+# the external auth-server; weather:read tokens are audience-bound to
+# resource-base-url + /mcp.
+weather:
+  mcp:
+    resource-base-url: ${MCP_RESOURCE_BASE_URL:http://localhost:8081}
+    authorization-server-url: ${AUTH_SERVER_URL:http://localhost:8083}
+    required-scope: ${MCP_REQUIRED_SCOPE:weather:read}
 
 eureka:
   client:

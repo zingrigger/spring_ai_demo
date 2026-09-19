@@ -53,9 +53,9 @@ class AuthServerMySqlIntegrationTest {
 
         Integer migrations = this.jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM flyway_schema_history
-                WHERE version IN ('1', '2') AND success = 1
+                WHERE version IN ('1', '2', '3') AND success = 1
                 """, Integer.class);
-        assertThat(migrations).isEqualTo(2);
+        assertThat(migrations).isEqualTo(3);
     }
 
     @Test

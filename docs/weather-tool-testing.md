@@ -66,7 +66,10 @@ curl --include http://localhost:8082/api/weather/Atlantis
 
 ### 1.3 验证 MCP OAuth 2.1 认证
 
-`weather-mcp-server` 同时作为 OAuth 授权服务器和资源服务器运行。`POST /mcp` 要求携带有效的 Bearer token，并且 token 必须包含 `weather:read` scope。
+`weather-mcp-server` 只作为 OAuth 2.1 资源服务器运行：它不签发 token，只校验由独立
+`auth-server`（`http://localhost:8083`）签发的 Bearer token。`POST /mcp` 要求 token 包含
+`weather:read` scope，且 audience 绑定到 `http://localhost:8081/mcp`。先按
+[auth-server 测试文档](auth-server-testing.md) 启动 auth-server。
 
 先检查受保护资源元数据：
 
@@ -78,8 +81,8 @@ curl --fail --silent http://localhost:8081/.well-known/oauth-protected-resource 
 
 ```json
 {
-  "resource": "http://localhost:8081/",
-  "authorization_servers": ["http://localhost:8081"]
+  "resource": "http://localhost:8081/mcp",
+  "authorization_servers": ["http://localhost:8083"]
 }
 ```
 
@@ -93,21 +96,22 @@ curl --include --silent --show-error \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
 ```
 
-使用演示用的 `client_credentials` 客户端获取 token：
+使用 auth-server 的 `client_credentials` 客户端获取 token：
 
 ```bash
 ACCESS_TOKEN=$(curl --fail --silent --show-error \
-  -X POST http://localhost:8081/oauth2/token \
-  --user weather-mcp-machine:demo-secret \
+  -X POST http://localhost:8083/oauth2/token \
+  --user auth-machine:auth-machine-secret \
   -d grant_type=client_credentials \
   -d scope=weather:read | jq -r '.access_token')
 ```
 
-后续请求通过 `Authorization: Bearer $ACCESS_TOKEN` 访问 `/mcp`。错误 secret、过期 token 或无效 token 应返回 `401`；token 缺少 `weather:read` scope 时应返回 `403`。
+后续请求通过 `Authorization: Bearer $ACCESS_TOKEN` 访问 `/mcp`。错误 secret、过期 token、
+issuer/audience 不匹配或签名无效的 token 返回 `401`；token 缺少 `weather:read` scope 时返回 `403`。
 
 ### 1.4 使用 MCP Inspector 测试 WeatherTool
 
-先启动 Eureka、Weather Service 和 MCP Server：
+先启动 auth-server（见 [auth-server 测试文档](auth-server-testing.md)）、Eureka、Weather Service 和 MCP Server：
 
 ```bash
 mvn -pl weather-service spring-boot:run
@@ -117,21 +121,18 @@ mvn -pl weather-service spring-boot:run
 mvn -pl weather-mcp-server spring-boot:run
 ```
 
-如果通过其他机器的 IP 地址打开 Inspector（例如 `http://192.168.1.10:6274`），需要让 MCP Server 白名单使用相同的主机名或 IP：
-
-```bash
-INSPECTOR_HOST=192.168.1.10 mvn -pl weather-mcp-server spring-boot:run
-```
-
-仅在同一台机器上使用 `http://127.0.0.1:6274` 时无需设置 `INSPECTOR_HOST`。
+Inspector 的 OAuth 回调地址在 auth-server 的 `V3__seed_weather_mcp_client.sql` 中注册为
+`http://127.0.0.1:6274/oauth/callback`、`http://localhost:6274/oauth/callback` 和
+`http://127.0.0.1:5173/callback`。通过其他机器的 IP 打开 Inspector 时，需要先把对应的
+回调地址注册到 auth-server。
 
 启动 MCP Inspector：
 
 ```bash
-npx --yes @modelcontextprotocol/inspector@1.0.2
+npx --yes @modelcontextprotocol/inspector@latest
 ```
 
-本项目当前使用 Spring AI 2.0.1。请固定使用 Inspector `1.0.2` 或更早版本；Inspector `2.x` 会额外发送 Spring AI 尚未支持的 `server/discover` 请求，导致连接失败。
+`@latest` 会拉取 Inspector 的最新发布版本；如需固定版本，把 `@latest` 换成具体的版本号。
 
 在 Inspector 中选择 `Streamable HTTP`，填入：
 
@@ -161,10 +162,11 @@ http://localhost:8081/mcp
 
 #### 方式二：使用 Inspector 的 OAuth 授权流程
 
-不要在 OAuth Settings 中填写 `weather-mcp-machine`，因为它只支持 `client_credentials`，不能访问 `/oauth2/authorize`。如果当前 Inspector 版本支持 OAuth 自动发现，在认证设置中选择 OAuth，并填写：
+不要在 OAuth Settings 中填写 `auth-machine`，因为它只支持 `client_credentials`，不能访问
+`/oauth2/authorize`。如果当前 Inspector 版本支持 OAuth 自动发现，在认证设置中选择 OAuth，并填写：
 
 ```text
-Client ID: weather-mcp-public
+Client ID: weather-mcp-inspector
 Client Secret: 留空
 Scopes: weather:read
 ```
@@ -175,14 +177,16 @@ Scopes: weather:read
 http://localhost:8081/.well-known/oauth-protected-resource
 ```
 
-再根据 `authorization_servers` 发现授权服务器并打开授权页面。登录演示账号：
+再根据 `authorization_servers` 发现 `auth-server`（`http://localhost:8083`）并打开授权页面。登录本地
+开发账号（来自 auth-server 的 `sys_identity_fixtures.sql`）：
 
 ```text
-用户名：demo
-密码：demo-password
+用户名：alice
+密码：alice-password
 ```
 
-授权完成后回到 Inspector，确认请求已带上 Bearer token，再调用 `get_weather_by_city`。当前服务为 `weather-mcp-public` 注册了 `http://127.0.0.1:5173/callback`、`http://localhost:6274/oauth/callback` 和 `http://${INSPECTOR_HOST}:6274/oauth/callback` 三个回调地址，最后一个默认使用 `127.0.0.1`。
+随后按 auth-server 的流程选择组织（例如 Alpha）并在确认页授权。授权完成后回到 Inspector，确认请求已带上
+Bearer token，再调用 `get_weather_by_city`。
 
 ### 1.5 不使用 Inspector，直接用 curl 测试 MCP 协议
 
@@ -394,4 +398,4 @@ Agent 应能理解 WeatherTool 返回的“不支持城市”错误，而不是�
 | 工具返回服务不可用 | 确认 `weather-service` 已启动且 Eureka 中为 `UP` |
 | Weather Service 直接可用但工具失败 | 检查 Eureka 服务名是否为 `WEATHER-SERVICE`，以及 Feign 配置的服务名为 `weather-service` |
 | 中文城市查询失败 | 先用 `curl` 验证 URL 编码，再使用 MCP Inspector 或 Agent 的结构化参数调用 |
-| Inspector 日志出现 `Missing handler for request type: server/discover` | 使用 `npx --yes @modelcontextprotocol/inspector@1.0.2`，不要使用 Inspector 2.x |
+| Inspector 无法完成 OAuth 发现 | 检查 `http://localhost:8081/.well-known/oauth-protected-resource` 返回的 `resource` 是否为 `http://localhost:8081/mcp`、`authorization_servers` 是否为 `http://localhost:8083`，并确认 auth-server 已启动 |

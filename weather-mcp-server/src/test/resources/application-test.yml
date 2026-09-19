@@ -8,3 +8,9 @@ spring:
   cloud:
     discovery:
       enabled: false
+
+weather:
+  mcp:
+    resource-base-url: http://localhost:8081
+    authorization-server-url: http://localhost:8083
+    required-scope: weather:read

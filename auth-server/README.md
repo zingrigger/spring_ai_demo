@@ -28,6 +28,7 @@
 | --- | --- | --- |
 | `server.port` | `SERVER_PORT` | `8083` |
 | `auth.issuer` | `AUTH_ISSUER` | `http://localhost:8083` |
+| `auth.resources.weather-mcp` | `WEATHER_MCP_RESOURCE` | `http://localhost:8081/mcp` |
 | `spring.datasource.url` | `DB_URL` | `jdbc:mysql://localhost:3306/auth?...` |
 | `spring.datasource.username` / `password` | `DB_USERNAME` / `DB_PASSWORD` | `root` / 空 |
 | `auth.keystore.location` | `AUTH_KEYSTORE_PATH` | 空（启动失败） |
@@ -90,6 +91,7 @@ secret 只保存编码值（`{bcrypt}...`），明文通过密钥管理或部署
 | --- | --- | --- |
 | `auth-web-public` | authorization_code + PKCE + refresh_token | `auth-web-secret` |
 | `auth-machine` | client_credentials | `auth-machine-secret` |
+| `weather-mcp-inspector` | authorization_code + PKCE（公钥客户端） | 无 |
 
 > 客户端 id 中的 `public` 是历史命名：Spring Authorization Server 只对已认证客户端签发
 > refresh token，而设计要求用户端获得可轮换 refresh token，因此该客户端使用
@@ -101,6 +103,17 @@ secret 只保存编码值（`{bcrypt}...`），明文通过密钥管理或部署
 -- secret 用 {bcrypt} 前缀保存；生成方式见 docs/auth-server-testing.md
 INSERT INTO oauth2_registered_client (...) VALUES (...);
 ```
+
+## 与 weather-mcp-server 对接
+
+`weather-mcp-server` 是资源服务器，只校验本服务器签发的 JWT，不再内嵌授权服务器：
+
+- 带 `weather:read` scope 的 access token 会把 `aud` 绑定到 `auth.resources.weather-mcp`
+  （默认 `http://localhost:8081/mcp`）。
+- 资源服务器通过 `AUTH_SERVER_URL`（默认 `http://localhost:8083`）校验 issuer 与
+  `/oauth2/jwks` 公钥，并检查 `aud`；两端配置必须指向同一个 issuer。
+- MCP Inspector 使用 `weather-mcp-inspector`（授权码 + PKCE），回调地址在
+  `V3__seed_weather_mcp_client.sql` 中注册。
 
 ## 测试
 

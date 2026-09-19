@@ -3,6 +3,7 @@ package com.example.auth.config;
 import com.example.auth.oidc.UserInfoService;
 import com.example.auth.security.OrganizationBindingFilter;
 import com.example.auth.token.AuthorizationTokenCustomizer;
+import com.example.auth.token.ResourceAudienceTokenCustomizer;
 import com.example.auth.token.TokenClaimsCustomizer;
 import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
@@ -119,11 +120,13 @@ public class AuthorizationServerConfig {
     @Bean
     OAuth2TokenGenerator<?> tokenGenerator(JwtEncoder jwtEncoder,
                                            TokenClaimsCustomizer tokenClaimsCustomizer,
-                                           AuthorizationTokenCustomizer authorizationTokenCustomizer) {
+                                           AuthorizationTokenCustomizer authorizationTokenCustomizer,
+                                           ResourceAudienceTokenCustomizer resourceAudienceTokenCustomizer) {
         JwtGenerator jwtGenerator = new JwtGenerator(jwtEncoder);
         jwtGenerator.setJwtCustomizer((context) -> {
             tokenClaimsCustomizer.customize(context);
             authorizationTokenCustomizer.customize(context);
+            resourceAudienceTokenCustomizer.customize(context);
         });
         OAuth2AccessTokenGenerator accessTokenGenerator = new OAuth2AccessTokenGenerator();
         OAuth2RefreshTokenGenerator refreshTokenGenerator = new OAuth2RefreshTokenGenerator();

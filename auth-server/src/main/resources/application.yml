@@ -20,6 +20,10 @@ spring:
 auth:
   # 正式环境必须为：https://auth.example.com，且不能有末尾斜杠
   issuer: ${AUTH_ISSUER:http://localhost:8083}
+  resources:
+    # weather:read token 的 audiences 绑定目标，必须与 weather-mcp-server 的
+    # weather.mcp.resource-base-url + /mcp 一致
+    weather-mcp: ${WEATHER_MCP_RESOURCE:http://localhost:8081/mcp}
   keystore:
     location: ${AUTH_KEYSTORE_PATH:}
     password: ${AUTH_KEYSTORE_PASSWORD:}

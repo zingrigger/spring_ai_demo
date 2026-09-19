@@ -18,11 +18,11 @@ mvn verify                   # 全仓库（weather-service、weather-mcp-server�
 | `AuthServerApplicationTest` | 应用名、端口与 `auth.oauth.*` 默认时长 |
 | `JdbcIdentityRepositoryTest` | BCrypt 密码原样读取、组织隔离、角色隔离、Flyway schema 与种子客户端 |
 | `KeyStoreConfigTest` | 密钥库缺失 / 口令错误 / alias 不存在时启动失败 |
-| `AuthorizationServerMetadataTest` | discovery、OIDC 元数据、JWKS、JDBC 客户端反序列化 |
+| `AuthorizationServerMetadataTest` | discovery、OIDC 元数据、JWKS、JDBC 客户端反序列化、MCP Inspector 客户端注册 |
 | `IdentityAuthenticationProviderTest` | BCrypt 认证成功/失败、统一错误、用户 ID 不取自请求 |
 | `OrganizationAuthorizationFlowTest` | 登录、CSRF、组织选择、非法组织 403、单组织直通 |
-| `OAuthAuthorizationCodeFlowTest` | PKCE 授权码全流程、错误 verifier、重复 code、redirect 不匹配、缺少 PKCE |
-| `ClientCredentialsFlowTest` | 机器客户端取令牌、scope 校验、错误凭据 401 |
+| `OAuthAuthorizationCodeFlowTest` | PKCE 授权码全流程、错误 verifier、重复 code、redirect 不匹配、缺少 PKCE、`aud` 绑定 MCP 资源 |
+| `ClientCredentialsFlowTest` | 机器客户端取令牌、scope 校验、错误凭据 401、`aud` 绑定 MCP 资源 |
 | `UserInfoTest` | UserInfo 返回用户/组织/角色、无令牌 401、关系撤销后 401 |
 | `TokenLifecycleSecurityTest` | 10 分钟 access token、过期拒绝、refresh 轮换、关系撤销、撤销令牌、introspect/revoke 客户端认证、CSRF |
 | `AuthServerMySqlIntegrationTest` | MySQL 8 上 Flyway 三表、client_credentials 与授权码流程的持久化 |
@@ -60,6 +60,11 @@ ACCESS_TOKEN=$(curl -s -XPOST http://localhost:8083/oauth2/token \
 curl -s -XPOST http://localhost:8083/oauth2/introspect \
   --user auth-machine:auth-machine-secret -d "token=$ACCESS_TOKEN" | jq .active
 
+# 3.1 weather:read token 必须 audience 绑定到 MCP 资源
+curl -s -XPOST http://localhost:8083/oauth2/introspect \
+  --user auth-machine:auth-machine-secret -d "token=$ACCESS_TOKEN" | jq .aud
+# 预期：["http://localhost:8081/mcp"]
+
 # 4. 浏览器授权码流程
 #    浏览器打开 /oauth2/authorize?... 并观察：登录页 → 组织选择页 → 授权确认页（/oauth2/consent，
 #    展示客户端名称、请求的 scopes 与当前组织）→ 回调携带 code
@@ -75,6 +80,7 @@ curl -s -XPOST http://localhost:8083/oauth2/introspect \
 | 用户 | `alice` / `alice-password`、`bob` / `bob-password`（测试 fixture） |
 | `auth-web-public` secret | `auth-web-secret` |
 | `auth-machine` secret | `auth-machine-secret` |
+| `weather-mcp-inspector` | 公钥客户端（无 secret，授权码 + PKCE） |
 | 测试签名密钥 | `auth-server/src/test/resources/keystore/auth-server-test.p12`，口令 `changeit` |
 
 生产必须改用外部 PKCS#12/JKS、HTTPS、真实 issuer，并通过密钥管理注入客户端明文 secret；

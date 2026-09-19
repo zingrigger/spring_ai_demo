@@ -26,7 +26,15 @@ The test profile disables Eureka registration, so the automated suite does not r
 
 ## Run
 
-Start the existing Eureka Server first. Then use two terminals:
+Start the existing Eureka Server first. To call authenticated MCP endpoints, also start
+`auth-server` (it needs MySQL and an external PKCS#12/JKS keystore — see
+[auth-server/README.md](auth-server/README.md)):
+
+```bash
+mvn -pl auth-server spring-boot:run
+```
+
+Then start the weather service and the MCP server:
 
 ```bash
 mvn -pl weather-service spring-boot:run
@@ -45,6 +53,13 @@ EUREKA_DEFAULT_ZONE=http://eureka-host:8761/eureka/ \
 
 Apply the same environment variable when starting `weather-mcp-server`.
 
+If `auth-server` runs under a different issuer (for example `https://auth.example.com`), pass the
+same value to the MCP server so it validates the right issuer and JWKS:
+
+```bash
+AUTH_SERVER_URL=https://auth.example.com mvn -pl weather-mcp-server spring-boot:run
+```
+
 ## Verify the Business API
 
 ```bash
@@ -55,30 +70,41 @@ Expected fields are `city`, `condition`, `temperatureCelsius`, `feelsLikeCelsius
 
 Supported cities are 北京/Beijing, 上海/Shanghai, 广州/Guangzhou, 深圳/Shenzhen, and 杭州/Hangzhou.
 
-## OAuth 2.1 认证（内嵌授权服务器）
+## OAuth 2.1 认证（auth-server 签发，MCP Server 校验）
 
-`weather-mcp-server` 使用 MCP 规范的 OAuth 2.1 认证：内嵌 Spring Authorization Server 签发 JWT，
-并对 `/mcp` 端点做资源服务器校验，要求 `scope=weather:read`。
+`weather-mcp-server` 只作为 OAuth 2.1 资源服务器：它不签发 token，也不提供登录页或授权端点，
+只校验独立 `auth-server`（`8083`）签发的 JWT。MCP 规范要求的角色分离由此完成：
 
-- 授权端点：
-  - Token：`POST http://localhost:8081/oauth2/token`
-  - 授权：`GET http://localhost:8081/oauth2/authorize`
-  - JWKS：`GET http://localhost:8081/oauth2/jwks`
-  - 发现：`GET http://localhost:8081/.well-known/oauth-authorization-server`
-- 受保护资源元数据：`GET http://localhost:8081/.well-known/oauth-protected-resource`
+- 授权服务器（`auth-server`）：
+  - Token：`POST http://localhost:8083/oauth2/token`
+  - 授权：`GET http://localhost:8083/oauth2/authorize`
+  - JWKS：`GET http://localhost:8083/oauth2/jwks`
+  - 发现：`GET http://localhost:8083/.well-known/oauth-authorization-server`
+- 受保护资源元数据（`weather-mcp-server`）：`GET http://localhost:8081/.well-known/oauth-protected-resource`
 
-### 客户端
+```json
+{
+  "resource": "http://localhost:8081/mcp",
+  "authorization_servers": ["http://localhost:8083"]
+}
+```
 
-| 客户端 | 流程 | 配置 |
+`/mcp` 要求 `Authorization: Bearer <access token>`，token 必须包含 `weather:read` scope，且
+audience 绑定到 `http://localhost:8081/mcp`；否则返回 `401`（scope 缺失返回 `403`）。
+
+### 客户端（在 auth-server 注册）
+
+| 客户端 | 流程 | 用途 |
 | --- | --- | --- |
-| `weather-mcp-public` | 授权码 + PKCE（公钥客户端，无 secret） | `redirect-uri: http://127.0.0.1:5173/callback` |
-| `weather-mcp-machine` | client_credentials | `weather-mcp-machine:demo-secret` |
+| `auth-machine` | client_credentials | 机器调用（本地 secret：`auth-machine-secret`） |
+| `weather-mcp-inspector` | 授权码 + PKCE（公钥客户端，无 secret） | MCP Inspector 等交互式 MCP 客户端 |
+| `auth-web-public` | 授权码 + PKCE + refresh_token | 示例 Web 客户端 |
 
 ### 用 client_credentials 取 token 并调用工具
 
 ```bash
-ACCESS_TOKEN=$(curl -s -XPOST http://localhost:8081/oauth2/token \
-  --user weather-mcp-machine:demo-secret \
+ACCESS_TOKEN=$(curl -s -XPOST http://localhost:8083/oauth2/token \
+  --user auth-machine:auth-machine-secret \
   -d grant_type=client_credentials -d scope=weather:read | jq -r .access_token)
 
 curl --silent --show-error \
@@ -94,13 +120,12 @@ curl --silent --show-error \
 ### 用 MCP Inspector 走授权码 + PKCE
 
 在 MCP Inspector 中选择 Streamable HTTP，填入 `http://localhost:8081/mcp`，跟随其内建 OAuth 流程
-（使用的客户端为 `weather-mcp-public`）。首次会跳转本机授权页并回调到 `http://127.0.0.1:5173/callback`。
+（使用的客户端为 `weather-mcp-inspector`，授权码 + PKCE，回调 `http://localhost:6274/oauth/callback`）。
+auth-server 会依次展示登录页、组织选择页和授权确认页。
 
-> 安全提醒：`client-secret`（`demo-secret`）与 `{noop}` 仅为本地演示。真实部署必须启用 TLS，
-> 并用启动参数覆盖密钥（保留 `{noop}` 前缀），例如
-> `--spring.security.oauth2.authorizationserver.client.weather-mcp-machine.registration.client-secret='{noop}<实际密钥>'`
-> （注意：带连字符的键名不能通过环境变量覆盖——Spring 的宽松绑定会丢弃连字符），
-> 或改用密钥管理服务 / 外部授权服务器（届时 MCP Server 仅保留资源服务器角色）。
+> 安全提醒：`auth-machine-secret` 等明文 secret 仅为本地演示。真实部署必须启用 TLS、使用密钥管理
+> 服务、把 auth-server 的 issuer 换成公开 HTTPS 地址，并用 `AUTH_SERVER_URL` 让 MCP Server 校验
+> 同一个 issuer/JWKS。
 
 ## Connect an MCP Client
 
@@ -156,6 +181,7 @@ scripts/auth-server-smoke.sh
 
 This demo enables MCP OAuth 2.1 authentication on `/mcp` (see above) but does **not**
 enable TLS in the demo profile. Do not expose `/mcp` directly to the public internet
-without TLS. A production deployment must enable TLS, externalize the OAuth client
-secret (or replace the embedded authorization server with an external IdP), and add
+without TLS. The MCP server only validates tokens issued by `auth-server`; a production
+deployment must enable TLS, externalize the auth-server signing key and client secrets,
+keep `AUTH_ISSUER` (auth-server) and `AUTH_SERVER_URL` (MCP server) in sync, and add
 network access controls in the application or an upstream gateway.

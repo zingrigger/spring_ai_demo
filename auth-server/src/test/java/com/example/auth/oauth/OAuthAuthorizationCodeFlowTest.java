@@ -57,12 +57,13 @@ class OAuthAuthorizationCodeFlowTest {
 
     @Test
     void exchangesTheCodeForAccessIdAndRefreshTokensWithUserClaims() throws Exception {
-        JsonNode tokens = this.flow.authorizeAndExchangeTokens("alice", "alice-password", 10L, "openid profile");
+        JsonNode tokens = this.flow.authorizeAndExchangeTokens("alice", "alice-password", 10L,
+                "openid profile weather:read");
 
         assertThat(tokens.path("token_type").asText()).isEqualTo("Bearer");
         // Ten minutes, minus the elapsed whole seconds of the request itself.
         assertThat(tokens.path("expires_in").asLong()).isBetween(595L, 600L);
-        assertThat(tokens.path("scope").asText()).contains("openid", "profile");
+        assertThat(tokens.path("scope").asText()).contains("openid", "profile", "weather:read");
         assertThat(tokens.path("refresh_token").asText()).isNotBlank();
 
         Jwt accessToken = this.jwtDecoder.decode(tokens.path("access_token").asText());
@@ -72,7 +73,8 @@ class OAuthAuthorizationCodeFlowTest {
         assertThat(accessToken.getClaimAsString("org_id")).isEqualTo("10");
         assertThat(accessToken.getClaimAsString("org_name")).isEqualTo("Alpha");
         assertThat(accessToken.getClaimAsStringList("roles")).containsExactlyInAnyOrder("ADMIN", "VIEWER");
-        assertThat(accessToken.getClaimAsStringList("scope")).contains("openid").contains("profile");
+        assertThat(accessToken.getClaimAsStringList("scope")).contains("openid").contains("profile").contains("weather:read");
+        assertThat(accessToken.getAudience()).containsExactly("http://localhost:8081/mcp");
 
         Jwt idToken = this.jwtDecoder.decode(tokens.path("id_token").asText());
         assertThat(idToken.getSubject()).isEqualTo("1");

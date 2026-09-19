@@ -21,7 +21,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Client credentials tokens carry the client identity and its scopes only.
+ * Client credentials tokens carry the client identity, its scopes and the
+ * audience of the resource those scopes grant access to.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -58,6 +59,7 @@ class ClientCredentialsFlowTest {
         Jwt token = this.jwtDecoder.decode(accessToken);
         assertThat(token.getSubject()).isEqualTo("auth-machine");
         assertThat(token.getClaimAsStringList("scope")).containsExactly("weather:read");
+        assertThat(token.getAudience()).containsExactly("http://localhost:8081/mcp");
         assertThat(token.getClaims())
                 .doesNotContainKeys("preferred_username", "name", "org_id", "org_name", "roles");
     }
@@ -68,6 +70,31 @@ class ClientCredentialsFlowTest {
                         .with(httpBasic("auth-machine", "wrong-secret"))
                         .param("grant_type", "client_credentials"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    /**
+     * Introspection reads the authorization back from the JDBC store, so the
+     * audience-bound claims must be serializable by the configured Jackson
+     * type validator as well.
+     */
+    @Test
+    void introspectsTheAudienceBoundToken() throws Exception {
+        String body = this.mockMvc.perform(post("/oauth2/token")
+                        .with(httpBasic("auth-machine", "auth-machine-secret"))
+                        .param("grant_type", "client_credentials")
+                        .param("scope", "weather:read"))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String accessToken = OBJECT_MAPPER.readTree(body).path("access_token").asText();
+
+        this.mockMvc.perform(post("/oauth2/introspect")
+                        .with(httpBasic("auth-machine", "auth-machine-secret"))
+                        .param("token", accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.active").value(true));
     }
 
     @Test

@@ -76,10 +76,11 @@ class JdbcIdentityRepositoryTest {
     @Test
     void appliesFlywaySchemaAndSeedsLocalClients() {
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM oauth2_registered_client", Integer.class))
-                .isEqualTo(2);
+                .isEqualTo(3);
         assertThat(jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM oauth2_registered_client WHERE client_id IN ('auth-web-public', 'auth-machine')",
-                Integer.class)).isEqualTo(2);
+                "SELECT COUNT(*) FROM oauth2_registered_client "
+                        + "WHERE client_id IN ('auth-web-public', 'auth-machine', 'weather-mcp-inspector')",
+                Integer.class)).isEqualTo(3);
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM oauth2_authorization", Integer.class)).isZero();
         assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM oauth2_authorization_consent", Integer.class)).isZero();
     }

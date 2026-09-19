@@ -112,4 +112,20 @@ class AuthorizationServerMetadataTest {
                 .matches("auth-machine-secret", machineClient.getClientSecret())).isTrue();
     }
 
+    @Test
+    void registersTheMcpInspectorClientForAuthorizationCodeWithPkce() {
+        RegisteredClient inspector = registeredClientRepository.findByClientId("weather-mcp-inspector");
+        assertThat(inspector).isNotNull();
+        assertThat(inspector.getClientAuthenticationMethods())
+                .containsExactly(ClientAuthenticationMethod.NONE);
+        assertThat(inspector.getAuthorizationGrantTypes()).containsExactly(
+                org.springframework.security.oauth2.core.AuthorizationGrantType.AUTHORIZATION_CODE);
+        assertThat(inspector.getScopes()).containsExactly("weather:read");
+        assertThat(inspector.getClientSettings().isRequireProofKey()).isTrue();
+        assertThat(inspector.getRedirectUris()).containsExactlyInAnyOrder(
+                "http://127.0.0.1:6274/oauth/callback",
+                "http://localhost:6274/oauth/callback",
+                "http://127.0.0.1:5173/callback");
+    }
+
 }
