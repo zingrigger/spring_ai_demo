@@ -45,6 +45,7 @@ public class SecurityConfig {
                 .securityContextRepository(securityContextRepository));
         http.authorizeHttpRequests((authorize) -> authorize
                 .requestMatchers("/", "/login", "/organizations", "/consent", "/assets/**", "/favicon.ico",
+                        "/index.html",
                         "/api/auth/session", "/api/auth/login", "/error", "/actuator/health").permitAll()
                 .anyRequest().authenticated());
         // SPA 场景：cookie 里的原始 token 直接作为 X-XSRF-TOKEN 发送，因此使用明文处理器。
