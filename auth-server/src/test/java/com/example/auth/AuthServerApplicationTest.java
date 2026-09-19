@@ -3,6 +3,10 @@ package com.example.auth;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Duration;
@@ -14,12 +18,22 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest(properties = {
         "spring.autoconfigure.exclude=org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration,org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration"
 })
+@ActiveProfiles("test")
 class AuthServerApplicationTest {
 
-    // The identity repository needs a JDBC DataSource, which this scaffold test
-    // deliberately excludes; mock it so the context stays database-free.
+    // These beans need a JDBC DataSource, which this scaffold test deliberately
+    // excludes; mock them so the context stays database-free.
     @MockitoBean
     private IdentityRepository identityRepository;
+
+    @MockitoBean
+    private RegisteredClientRepository registeredClientRepository;
+
+    @MockitoBean
+    private OAuth2AuthorizationService authorizationService;
+
+    @MockitoBean
+    private OAuth2AuthorizationConsentService authorizationConsentService;
 
     @Value("${spring.application.name}")
     private String applicationName;

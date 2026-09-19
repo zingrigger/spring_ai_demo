@@ -1,0 +1,9 @@
+# Test-only signing key: a self-signed 2048-bit RSA key generated for tests.
+# It is not a production secret and must never be reused outside tests.
+auth:
+  issuer: http://localhost:8083
+  keystore:
+    location: classpath:keystore/auth-server-test.p12
+    password: changeit
+    type: PKCS12
+    alias: auth-server-test
