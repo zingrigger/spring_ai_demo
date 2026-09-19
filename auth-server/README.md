@@ -16,8 +16,10 @@
 | `GET /oauth2/jwks` | 公钥集 |
 | `POST /oauth2/introspect` / `POST /oauth2/revoke` | 仅限已认证客户端 |
 | `GET /userinfo` | OIDC UserInfo（需要 `openid` scope） |
-| `GET /login`、`GET/POST /organizations` | 自定义登录页与组织选择页 |
-| `GET /oauth2/consent` | 自定义授权确认页（客户端名称、请求的 scopes、当前组织） |
+| `GET /`、`/login`、`/organizations`、`/consent` | Vue SPA 页面（转发到 `index.html`） |
+| `GET /api/auth/session`、`POST /api/auth/login`、`POST /api/auth/logout` | SPA 登录会话 API |
+| `GET /api/organizations`、`POST /api/organizations` | 组织选择 API（单组织自动绑定） |
+| `GET /api/consent` | 授权确认页数据 API |
 | `GET /actuator/health` | 仅返回聚合状态（不包含组件明细） |
 
 ## 配置
@@ -79,8 +81,27 @@
    mvn -pl auth-server spring-boot:run
    ```
 
-4. 验收：`curl -s http://localhost:8083/actuator/health` 与 `scripts/auth-server-smoke.sh`
+4. 前端页面由 `auth-web/` 构建（`mvn -pl auth-server verify` 会自动执行）：
+   - 只改后端时用 `-DskipFrontend=true` 跳过前端构建；
+   - 只改前端时执行 `cd auth-web && npm install && npm run dev`，Vite（5173）会把
+     `/api`、`/oauth2`、`/.well-known`、`/userinfo`、`/actuator` 代理到 `8083`；
+   - 完整体验（含 MCP 客户端发起的授权流程）请先构建前端再启动 8083。
+
+5. 验收：`curl -s http://localhost:8083/actuator/health` 与 `scripts/auth-server-smoke.sh`
    （见 [测试文档](../docs/auth-server-testing.md)）。
+
+## 可选：用 Nginx 托管 SPA（同源部署）
+
+```nginx
+root /srv/auth-web/dist;
+location / { try_files $uri /index.html; }
+location ~ ^/(api|oauth2|\.well-known|userinfo|actuator)/ {
+    proxy_pass http://127.0.0.1:8083;
+    proxy_set_header Host $host;
+}
+```
+
+浏览器视角仍是单一 origin，session cookie 与 CSRF 行为与打进 jar 时完全一致。
 
 ## 客户端注册
 

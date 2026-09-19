@@ -7,6 +7,7 @@ This project demonstrates an external AI Agent calling a Spring AI MCP Server ov
 - `weather-service` — simulated weather REST API on port `8082`
 - `weather-mcp-server` — Streamable HTTP MCP Server on port `8081`
 - `auth-server` — OAuth 2.1 / OIDC authorization server on port `8083`
+- `auth-web` — auth-server 的 Vue 3 前端工程（构建产物打进 auth-server jar，也可由 Nginx 同源托管）
 
 An AI Agent, MCP Client, and Eureka Server are intentionally not included.
 

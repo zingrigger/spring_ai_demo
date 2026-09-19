@@ -7,3 +7,6 @@ target/
 .m2-repo/
 .worktrees/
 /auth-server/local/
+auth-web/node_modules/
+auth-web/dist/
+.superpowers/

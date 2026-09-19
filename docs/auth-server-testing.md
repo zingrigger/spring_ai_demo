@@ -20,11 +20,15 @@ mvn verify                   # 全仓库（weather-service、weather-mcp-server�
 | `KeyStoreConfigTest` | 密钥库缺失 / 口令错误 / alias 不存在时启动失败 |
 | `AuthorizationServerMetadataTest` | discovery、OIDC 元数据、JWKS、JDBC 客户端反序列化、MCP Inspector 客户端注册 |
 | `IdentityAuthenticationProviderTest` | BCrypt 认证成功/失败、统一错误、用户 ID 不取自请求 |
-| `OrganizationAuthorizationFlowTest` | 登录、CSRF、组织选择、非法组织 403、单组织直通 |
+| `AuthenticationEntryPointTest` | 入口点分流（API 401 / HTML 302 `/login`）、组织绑定后续跑授权请求 |
+| `AuthApiControllerTest` | JSON 会话探测、登录成功/失败 401、缺少 CSRF 403、登出 204 |
+| `OrganizationApiControllerTest` | 组织列表、单组织自动绑定、越权选择 403 |
+| `ConsentApiControllerTest` | consent 数据接口的 scope 拆分/去重/过滤与未知客户端回退 |
+| `SpaRoutingTest` | SPA 路由转发到 `index.html`（`no-cache`）、构建产物的外壳内容 |
 | `OAuthAuthorizationCodeFlowTest` | PKCE 授权码全流程、错误 verifier、重复 code、redirect 不匹配、缺少 PKCE、`aud` 绑定 MCP 资源 |
 | `ClientCredentialsFlowTest` | 机器客户端取令牌、scope 校验、错误凭据 401、`aud` 绑定 MCP 资源 |
 | `UserInfoTest` | UserInfo 返回用户/组织/角色、无令牌 401、关系撤销后 401 |
-| `TokenLifecycleSecurityTest` | 10 分钟 access token、过期拒绝、refresh 轮换、关系撤销、撤销令牌、introspect/revoke 客户端认证、CSRF |
+| `TokenLifecycleSecurityTest` | 10 分钟 access token、过期拒绝、refresh 轮换、关系撤销、撤销令牌、introspect/revoke 客户端认证 |
 | `AuthServerMySqlIntegrationTest` | MySQL 8 上 Flyway 三表、client_credentials 与授权码流程的持久化 |
 
 ## Smoke 脚本
@@ -39,6 +43,14 @@ introspection 返回 `active=true`、revoke 后 `active=false`、错误客户端
 任一检查失败脚本以非零退出；脚本不会把令牌写入文件或标准输出。
 
 依赖：`curl`、`jq`。
+
+## SPA 页面验收（手动）
+
+1. `mvn -pl auth-server verify`（构建前端）后启动 8083。
+2. 访问 `http://localhost:8083/login`：应看到品牌分栏布局的登录页，右上角可切换中文/EN。
+3. 用 MCP Inspector 走完整授权码流程：登录 → 组织选择 → 授权确认 → 回到客户端拿到 token。
+4. 刷新 `/login`、`/organizations`、`/consent`、`/` 任意一次都不应出现 404。
+5. 浏览器 DevTools 中确认所有请求同源、无 CORS 预检；窄屏（< 768px）下品牌分栏折叠。
 
 ## 手工验收
 
