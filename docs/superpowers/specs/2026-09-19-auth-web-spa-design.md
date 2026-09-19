@@ -50,6 +50,9 @@
   在反向代理里成为纯前端路由。
 - consent 的「同意」触发授权码签发并把浏览器 302 回客户端的 `redirect_uri`，必须是浏览器顶层
   表单 POST（`POST /oauth2/authorize`），不能由 fetch 代劳。
+- Spring Authorization Server 默认忽略其全部端点的 CSRF 校验（`OAuth2AuthorizationServerConfigurer`
+  对 `endpointsMatcher` 调用 `csrf.ignoringRequestMatchers`），因此 consent 表单只需
+  `client_id`、`state`、重复的 `scope` 三个字段，不需要 `_csrf`。
 - consent 页路由从 `/oauth2/consent` 改为 `/consent`，使 `/oauth2/*` 在反向代理中保持「纯后端」。
 
 **决策 3：构建进 jar 为默认，Nginx 同源反代为可选部署。** 两种形态浏览器视角都是同源，
@@ -87,7 +90,7 @@ Cookie / CSRF 复杂度相同；演示环境只需一个 jar，生产环境可�
 8  auth-server     已登录 + 已绑定 + 未同意过 → 302 /consent?client_id=…&scope=…&state=…
                    已同意过 → 跳过 consent，直接签发 code
 9  SPA             GET /api/consent?… → 客户端名称、scopes、组织、用户
-10 SPA             用户勾选 scope 后提交原生表单 POST /oauth2/authorize（含 _csrf）
+10 SPA             用户勾选 scope 后提交原生表单 POST /oauth2/authorize
 11 auth-server     302 redirect_uri?code=…&state=…
 12 MCP 客户端      POST /oauth2/token + PKCE verifier → access / refresh token
 ```
@@ -128,7 +131,7 @@ Cookie / CSRF 复杂度相同；演示环境只需一个 jar，生产环境可�
      避免打断 `/organizations`、`/consent` 上正在进行的步骤）。
 - scope 展示名放在 i18n（`profile` → 读取基本资料、`weather:read` → 读取天气数据），未知 scope 显示原始值。
 - consent 表单：Vue 动态构造隐藏 `<form method="post" action="/oauth2/authorize">`，
-  字段为 `client_id`、`state`、重复的 `scope`、`_csrf`，然后 `submit()`。
+  字段为 `client_id`、`state`、重复的 `scope`，然后 `submit()`（SAS 端点忽略 CSRF，见第 2 节）。
 
 ### 文件布局
 
@@ -140,7 +143,7 @@ auth-web/
     api/client.ts        # fetch 封装：JSON、X-XSRF-TOKEN、错误映射
     api/auth.ts          # session / login / logout / organizations / consent
     views/{LoginView,OrganizationsView,ConsentView,HomeView}.vue
-    components/{AuthLayout,FormField,AlertBanner,LocaleSwitch}.vue
+    components/{AuthLayout,LocaleSwitch}.vue
     i18n/{index.ts,zh.ts,en.ts}
     assets/main.css      # Tailwind v4 入口
   tests/                 # Vitest + @vue/test-utils
@@ -156,7 +159,7 @@ auth-web/
 | GET | `/api/organizations` | 已登录 | – | `200 {organizations:[{id,name}], next: string\|null}`（`next` 非空 = 单组织已自动绑定）；无组织 `403 {error:"access_denied"}` |
 | POST | `/api/organizations` | 已登录 + CSRF | `{orgId}` | `200 {next}`；越权 `403 {error:"access_denied"}` |
 | GET | `/api/consent` | 已登录 | `?client_id&scope&state` | `{clientId, clientName, scopes:[…], state, organization, user}` |
-| POST | `/oauth2/authorize` | session + CSRF | 表单：`client_id, state, scope[], _csrf` | `302` 回客户端 `redirect_uri` |
+| POST | `/oauth2/authorize` | session | 表单：`client_id, state, scope[]` | `302` 回客户端 `redirect_uri` |
 
 - `GET /api/organizations` 在用户只有一个组织时由服务端直接绑定并返回 `next`，不显示选择页
   （保持现有行为）。
@@ -167,10 +170,11 @@ auth-web/
 
 ## 7. 安全设计
 
-- **CSRF**：`CookieCsrfTokenRepository.withHttpOnlyFalse()` + 显式的明文
+- **CSRF**：作用于应用链的 `/api/**` 写请求。`CookieCsrfTokenRepository.withHttpOnlyFalse()` + 显式的明文
   `CsrfTokenRequestAttributeHandler`（不用 XOR 处理器）。服务端不再渲染含 token 的 HTML，
-  BREACH 不适用；明文处理器保证同一个 cookie 值既能做 `X-XSRF-TOKEN` 请求头，也能做 consent
-  表单的 `_csrf` 字段。`GET /api/auth/session` 主动解析一次 token，确保首个响应就下发 cookie。
+  BREACH 不适用；明文处理器让 SPA 可以直接把 cookie 里的原始 token 放进 `X-XSRF-TOKEN` 请求头
+  （默认的 XOR 处理器会要求掩码后的值）。`GET /api/auth/session` 主动解析一次 token，确保首个
+  响应就下发 cookie。SAS 链的端点不参与 CSRF 校验（见第 2 节），两条链因此互不影响。
 - **Cookie**：`JSESSIONID` 维持 HttpOnly + SameSite=Lax；`XSRF-TOKEN` JS 可读、SameSite=Lax；
   文档注明生产环境必须启用 `Secure` 与 TLS。
 - **会话固定**：登录改为自定义 JSON 端点后，成功时显式执行 session id 变更
@@ -214,8 +218,8 @@ auth-web/
   token 生命周期等断言全部保留。
 - 新增 API 测试：登录成功 / 失败 401、session 匿名 / 已登录 / 已绑定三态、组织列表
   （多组织 / 单组织自动绑定）、越权选组织 403、consent 数据、缺少 CSRF 403。
-- 前端产物测试：`GET /login` 返回 `index.html`；标 `@Tag("frontend")`，
-  Maven 在 `-DskipFrontend=true` 时通过 `excludedGroups` 跳过该 Tag。
+- 前端产物测试：断言 `GET /login` 转发到 `index.html`、`GET /index.html` 返回 SPA 外壳；
+  用 JUnit `Assumptions` 判断 classpath 里是否存在 `static/index.html`，未构建前端时自动跳过。
 - `scripts/auth-server-smoke.sh` 不受影响，继续作为机器端点验收。
 
 前端（Vitest + @vue/test-utils）：
@@ -248,5 +252,5 @@ auth-web/
 3. 刷新 `/login`、`/organizations`、`/consent`、`/` 任意路由不出现 404；jar 形态按本节验收，
    文档中的 Nginx 示例配置做一次本地手工验证（不进入自动化测试）。
 4. 中英文切换生效并持久化；窄屏下品牌分栏折叠。
-5. 浏览器 Network 面板中所有请求同源，无 CORS 预检；缺少 CSRF 的写请求返回 403。
+5. 浏览器 Network 面板中所有请求同源，无 CORS 预检；缺少 CSRF 的 `/api/**` 写请求返回 403。
 6. 仓库中不再存在 Thymeleaf 依赖与模板；`scripts/auth-server-smoke.sh` 通过。
