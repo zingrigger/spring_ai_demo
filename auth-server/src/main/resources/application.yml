@@ -1,0 +1,22 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: auth-server
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/auth}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+auth:
+  issuer: ${AUTH_ISSUER:http://localhost:8083}
+  keystore:
+    location: ${AUTH_KEYSTORE_PATH:}
+    password: ${AUTH_KEYSTORE_PASSWORD:}
+    type: ${AUTH_KEYSTORE_TYPE:PKCS12}
+    alias: ${AUTH_KEYSTORE_ALIAS:}
+  token:
+    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:PT15M}
+    refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:P7D}

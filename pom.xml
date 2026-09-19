@@ -17,6 +17,7 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>auth-server</module>
         <module>weather-service</module>
         <module>weather-mcp-server</module>
     </modules>
