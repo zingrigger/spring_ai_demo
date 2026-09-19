@@ -17,6 +17,7 @@
 | `POST /oauth2/introspect` / `POST /oauth2/revoke` | 仅限已认证客户端 |
 | `GET /userinfo` | OIDC UserInfo（需要 `openid` scope） |
 | `GET /login`、`GET/POST /organizations` | 自定义登录页与组织选择页 |
+| `GET /oauth2/consent` | 自定义授权确认页（客户端名称、请求的 scopes、当前组织） |
 | `GET /actuator/health` | 仅返回聚合状态（不包含组件明细） |
 
 ## 配置

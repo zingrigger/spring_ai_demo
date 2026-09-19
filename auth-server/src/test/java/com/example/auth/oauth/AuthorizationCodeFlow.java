@@ -85,7 +85,36 @@ public final class AuthorizationCodeFlow {
     /**
      * Runs the flow up to the issued authorization code and returns it.
      */
-    String authorize(String account, String password, long orgId, String scope) throws Exception {
+    public String authorize(String account, String password, long orgId, String scope) throws Exception {
+        MockHttpSession session = loginAndSelectOrganization(account, password, orgId, scope);
+        MvcResult authorization = this.mockMvc.perform(authorizeRequest(scope, VERIFIER).session(session))
+                .andReturn();
+
+        String location;
+        if (isClientRedirect(authorization)) {
+            // Scopes that are implicitly approved (openid) skip the consent page.
+            location = authorization.getResponse().getRedirectedUrl();
+        }
+        else {
+            location = submitConsent(session, consentPageHtml(session, authorization));
+        }
+        assertThat(location).startsWith(REDIRECT_URI);
+        assertThat(queryParameter(location, "state")).isEqualTo(STATE);
+        return queryParameter(location, "code");
+    }
+
+    /**
+     * Returns the rendered authorization confirmation page for the given request.
+     */
+    public String consentPage(String account, String password, long orgId, String scope) throws Exception {
+        MockHttpSession session = loginAndSelectOrganization(account, password, orgId, scope);
+        MvcResult authorization = this.mockMvc.perform(authorizeRequest(scope, VERIFIER).session(session))
+                .andReturn();
+        return consentPageHtml(session, authorization);
+    }
+
+    private MockHttpSession loginAndSelectOrganization(String account, String password, long orgId, String scope)
+            throws Exception {
         MvcResult start = this.mockMvc.perform(authorizeRequest(scope, VERIFIER))
                 .andExpect(status().is3xxRedirection())
                 .andReturn();
@@ -100,45 +129,80 @@ public final class AuthorizationCodeFlow {
         this.mockMvc.perform(post("/organizations").session(session).with(csrf())
                         .param("orgId", String.valueOf(orgId)))
                 .andExpect(status().is3xxRedirection());
+        return session;
+    }
 
-        // Back at the authorization endpoint. When the client still needs consent, the
-        // default consent page is rendered with an internal state token; scopes that are
-        // implicitly approved (openid) skip the page and redirect straight back.
-        MvcResult consentPage = this.mockMvc.perform(authorizeRequest(scope, VERIFIER).session(session))
-                .andReturn();
-        String location;
-        if (consentPage.getResponse().getStatus() == 302) {
-            location = consentPage.getResponse().getRedirectedUrl();
+    /**
+     * The authorization endpoint either renders the consent page inline or
+     * redirects to the configured {@code /oauth2/consent} page; the redirect is
+     * followed here with the query parameters decoded.
+     */
+    private String consentPageHtml(MockHttpSession session, MvcResult authorization) throws Exception {
+        if (authorization.getResponse().getStatus() == 200) {
+            return authorization.getResponse().getContentAsString();
         }
-        else {
-            assertThat(consentPage.getResponse().getStatus()).isEqualTo(200);
-            String consentHtml = consentPage.getResponse().getContentAsString();
-            MvcResult consent = this.mockMvc.perform(post("/oauth2/authorize").session(session)
-                            .param("client_id", CLIENT_ID)
-                            .param("state", hiddenField(consentHtml, "state"))
-                            .param("scope", scopesOf(consentHtml).toArray(String[]::new)))
-                    .andExpect(status().is3xxRedirection())
-                    .andReturn();
-            location = consent.getResponse().getRedirectedUrl();
-        }
-        assertThat(location).startsWith(REDIRECT_URI);
-        assertThat(queryParameter(location, "state")).isEqualTo(STATE);
-        return queryParameter(location, "code");
+        String location = authorization.getResponse().getRedirectedUrl();
+        assertThat(location).as("authorization endpoint did not render or redirect to a consent page").isNotNull();
+
+        MockHttpServletRequestBuilder request = get(location.startsWith("http://")
+                ? java.net.URI.create(location).getPath()
+                : location.substring(0, location.indexOf('?') > 0 ? location.indexOf('?') : location.length()));
+        queryParameters(location).forEach((name, value) -> request.param(name, value));
+        return this.mockMvc.perform(request.session(session))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+    }
+
+    private static boolean isClientRedirect(MvcResult authorization) {
+        String location = authorization.getResponse().getRedirectedUrl();
+        return authorization.getResponse().getStatus() == 302
+                && location != null
+                && location.startsWith(REDIRECT_URI);
+    }
+
+    private static java.util.Map<String, String> queryParameters(String url) {
+        java.util.Map<String, String> decoded = new java.util.LinkedHashMap<>();
+        UriComponentsBuilder.fromUriString(url).build().getQueryParams().forEach(
+                (name, values) -> decoded.put(name, java.net.URLDecoder.decode(values.getFirst(), StandardCharsets.UTF_8)));
+        return decoded;
+    }
+
+    private String submitConsent(MockHttpSession session, String consentHtml) throws Exception {
+        return this.mockMvc.perform(post("/oauth2/authorize").session(session)
+                        .param("client_id", CLIENT_ID)
+                        .param("state", hiddenField(consentHtml, "state"))
+                        .param("scope", scopesOf(consentHtml).toArray(String[]::new)))
+                .andExpect(status().is3xxRedirection())
+                .andReturn()
+                .getResponse()
+                .getRedirectedUrl();
     }
 
     private static String hiddenField(String html, String name) {
-        Matcher matcher = Pattern.compile("name=\"" + Pattern.quote(name) + "\" value=\"([^\"]*)\"").matcher(html);
-        assertThat(matcher.find()).as("consent page exposes hidden field %s", name).isTrue();
-        return matcher.group(1);
+        return inputValues(html, name).stream().findFirst()
+                .orElseThrow(() -> new AssertionError("authorization page does not expose field " + name));
     }
 
     private static List<String> scopesOf(String html) {
-        Matcher matcher = Pattern.compile("name=\"scope\" value=\"([^\"]*)\"").matcher(html);
-        List<String> scopes = new ArrayList<>();
-        while (matcher.find()) {
-            scopes.add(matcher.group(1));
+        return inputValues(html, "scope");
+    }
+
+    private static List<String> inputValues(String html, String name) {
+        Pattern inputTag = Pattern.compile("<input\\b[^>]*>", Pattern.CASE_INSENSITIVE);
+        Pattern nameAttribute = Pattern.compile("name=\"" + Pattern.quote(name) + "\"");
+        Pattern valueAttribute = Pattern.compile("value=\"([^\"]*)\"");
+        List<String> values = new ArrayList<>();
+        Matcher inputs = inputTag.matcher(html);
+        while (inputs.find()) {
+            String tag = inputs.group();
+            Matcher value = valueAttribute.matcher(tag);
+            if (nameAttribute.matcher(tag).find() && value.find()) {
+                values.add(value.group(1));
+            }
         }
-        return scopes;
+        return values;
     }
 
     static MockHttpServletRequestBuilder authorizeRequest(String scope, String verifier) throws Exception {

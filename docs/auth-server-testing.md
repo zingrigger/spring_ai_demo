@@ -61,7 +61,8 @@ curl -s -XPOST http://localhost:8083/oauth2/introspect \
   --user auth-machine:auth-machine-secret -d "token=$ACCESS_TOKEN" | jq .active
 
 # 4. 浏览器授权码流程
-#    浏览器打开 /oauth2/authorize?... 并观察：登录页 → 组织选择页 → 授权确认页 → 回调携带 code
+#    浏览器打开 /oauth2/authorize?... 并观察：登录页 → 组织选择页 → 授权确认页（/oauth2/consent，
+#    展示客户端名称、请求的 scopes 与当前组织）→ 回调携带 code
 ```
 
 授权码流程需要注册的 `redirect_uri`、PKCE `code_challenge`（S256）和已登记 scopes；

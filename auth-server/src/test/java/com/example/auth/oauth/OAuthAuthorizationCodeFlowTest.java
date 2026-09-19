@@ -80,6 +80,13 @@ class OAuthAuthorizationCodeFlowTest {
     }
 
     @Test
+    void consentPageShowsTheClientTheScopesAndTheOrganization() throws Exception {
+        String html = this.flow.consentPage("alice", "alice-password", 10L, "openid profile");
+
+        assertThat(html).contains("Authorize access", "Auth Web Client", "profile", "Alpha");
+    }
+
+    @Test
     void rejectsAWrongCodeVerifier() throws Exception {
         String code = this.flow.authorize("alice", "alice-password", 10L, "openid");
 
