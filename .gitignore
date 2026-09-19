@@ -6,3 +6,4 @@ target/
 .settings/
 .m2-repo/
 .worktrees/
+/auth-server/local/

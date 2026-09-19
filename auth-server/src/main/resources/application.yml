@@ -13,8 +13,12 @@ spring:
     username: ${DB_USERNAME:root}
     password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 0
 
 auth:
+  # 正式环境必须为：https://auth.example.com，且不能有末尾斜杠
   issuer: ${AUTH_ISSUER:http://localhost:8083}
   keystore:
     location: ${AUTH_KEYSTORE_PATH:}
