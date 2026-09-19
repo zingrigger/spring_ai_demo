@@ -22,7 +22,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Binds the organization a user authorizes from. Only organizations the user is
@@ -74,9 +76,11 @@ public class OrganizationController {
 
     private void bind(AuthenticatedUser user, Organization organization, Authentication authentication,
                       HttpServletRequest request, HttpServletResponse response) {
+        // A mutable list keeps the persisted Jackson type inside the framework's
+        // polymorphic allow list (immutable JDK collections are rejected there).
         List<String> roles = this.identityRepository.findRoles(user.id(), organization.id()).stream()
                 .map(Role::name)
-                .toList();
+                .collect(Collectors.toCollection(ArrayList::new));
         OrganizationAuthorization binding = new OrganizationAuthorization(
                 user.id(), organization.id(), organization.name(), roles);
 

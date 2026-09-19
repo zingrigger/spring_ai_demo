@@ -7,6 +7,7 @@ import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -40,6 +41,9 @@ class IdentityAuthenticationProviderTest {
         assertThat(user.account()).isEqualTo("alice");
         assertThat(user.name()).isEqualTo("Alice");
         assertThat(result.getCredentials()).isNull();
+        assertThat(result.getAuthorities())
+                .singleElement()
+                .isInstanceOf(FactorGrantedAuthority.class);
     }
 
     @Test

@@ -7,10 +7,12 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.authority.FactorGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -62,7 +64,13 @@ public class IdentityAuthenticationProvider implements AuthenticationProvider {
         }
 
         AuthenticatedUser principal = new AuthenticatedUser(user.id(), user.account(), user.name());
-        return UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of());
+        // Spring Authorization Server reads the authentication time from the
+        // password factor when it issues an ID token.
+        FactorGrantedAuthority passwordFactor = FactorGrantedAuthority
+                .withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
+                .issuedAt(Instant.now())
+                .build();
+        return UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of(passwordFactor));
     }
 
     @Override

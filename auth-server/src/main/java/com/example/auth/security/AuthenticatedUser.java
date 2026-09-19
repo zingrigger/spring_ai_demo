@@ -1,5 +1,7 @@
 package com.example.auth.security;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -12,64 +14,56 @@ import java.util.List;
  * <p>The BCrypt hash stays in the database: this principal only carries the
  * numeric id, the account and the display name, so the credential is never
  * persisted with the OAuth authorization it takes part in.
+ *
+ * <p>Its Jackson shape is the record itself, because the principal is stored
+ * with the OAuth2 authorization attributes; the derived {@link UserDetails}
+ * accessors are ignored.
  */
-public class AuthenticatedUser implements UserDetails {
+@JsonIgnoreProperties(ignoreUnknown = true)
+public record AuthenticatedUser(long id, String account, String name) implements UserDetails {
 
     private static final long serialVersionUID = 1L;
 
-    private final long id;
-    private final String account;
-    private final String name;
-
-    public AuthenticatedUser(long id, String account, String name) {
-        this.id = id;
-        this.account = account;
-        this.name = name;
-    }
-
-    public long id() {
-        return this.id;
-    }
-
-    public String account() {
-        return this.account;
-    }
-
-    public String name() {
-        return this.name;
-    }
-
     @Override
+    @JsonIgnore
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of();
     }
 
     @Override
+    @JsonIgnore
     public String getPassword() {
         return "";
     }
 
     @Override
+    @JsonIgnore
     public String getUsername() {
-        return this.account;
+        // The design uses the numeric user id as the token subject, while the
+        // login account is carried as preferred_username.
+        return String.valueOf(this.id);
     }
 
     @Override
+    @JsonIgnore
     public boolean isAccountNonExpired() {
         return true;
     }
 
     @Override
+    @JsonIgnore
     public boolean isAccountNonLocked() {
         return true;
     }
 
     @Override
+    @JsonIgnore
     public boolean isCredentialsNonExpired() {
         return true;
     }
 
     @Override
+    @JsonIgnore
     public boolean isEnabled() {
         return true;
     }

@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.context.DelegatingSecurityContextRepository;
@@ -13,6 +14,8 @@ import org.springframework.security.web.context.RequestAttributeSecurityContextR
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
+
+import java.util.Map;
 
 /**
  * Security for the login and organization pages. The authorization server
@@ -54,6 +57,12 @@ public class SecurityConfig {
 
     @Bean
     PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        // Matches both the BCrypt hashes stored in sys_user and the
+        // {bcrypt}-prefixed secrets stored in oauth2_registered_client: the
+        // DefaultPasswordEncoderForMatches covers values without a {id} prefix.
+        DelegatingPasswordEncoder encoder = new DelegatingPasswordEncoder(
+                "bcrypt", Map.of("bcrypt", new BCryptPasswordEncoder()));
+        encoder.setDefaultPasswordEncoderForMatches(new BCryptPasswordEncoder());
+        return encoder;
     }
 }

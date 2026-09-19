@@ -1,5 +1,10 @@
 -- Fixtures for the read-only business identity tables. These tables are owned by
 -- another system in production; tests create them so auth-server never migrates them.
+-- OAuth state is reset too so every test starts without a stored authorization
+-- or consent (both tables exist once Flyway has run).
+DELETE FROM oauth2_authorization;
+DELETE FROM oauth2_authorization_consent;
+
 DROP TABLE IF EXISTS sys_user_org_role;
 DROP TABLE IF EXISTS sys_role;
 DROP TABLE IF EXISTS sys_org;
