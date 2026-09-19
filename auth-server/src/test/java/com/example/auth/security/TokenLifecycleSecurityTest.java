@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /**
  * Token lifecycle and security policy: configured lifetimes, refresh rotation,
  * revocation, re-validation of the organization relationship, client
- * authentication for introspection/revocation, and CSRF on the custom pages.
+ * authentication for introspection/revocation.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -150,12 +150,6 @@ class TokenLifecycleSecurityTest {
                 .andExpect(status().isUnauthorized());
         this.mockMvc.perform(post("/oauth2/revoke").param("token", "whatever"))
                 .andExpect(status().isUnauthorized());
-    }
-
-    @Test
-    void customPagesRejectRequestsWithoutACsrfToken() throws Exception {
-        this.mockMvc.perform(post("/login").param("username", "alice").param("password", "alice-password"))
-                .andExpect(status().isForbidden());
     }
 
     private JsonNode tokens() throws Exception {

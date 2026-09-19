@@ -3,23 +3,32 @@ package com.example.auth.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.session.ChangeSessionIdAuthenticationStrategy;
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 import org.springframework.security.web.context.DelegatingSecurityContextRepository;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.RequestAttributeSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
+import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Security for the login and organization pages. The authorization server
@@ -35,17 +44,27 @@ public class SecurityConfig {
         http.securityContext((securityContext) -> securityContext
                 .securityContextRepository(securityContextRepository));
         http.authorizeHttpRequests((authorize) -> authorize
-                .requestMatchers("/login", "/error", "/actuator/health",
-                        "/api/auth/session", "/api/auth/login").permitAll()
+                .requestMatchers("/", "/login", "/organizations", "/consent", "/assets/**", "/favicon.ico",
+                        "/api/auth/session", "/api/auth/login", "/error", "/actuator/health").permitAll()
                 .anyRequest().authenticated());
-        http.formLogin((formLogin) -> formLogin
-                .loginPage("/login")
-                // Organization selection always follows a successful login; the
-                // pending authorization request stays in the request cache.
-                .successHandler((request, response, authentication) -> response.sendRedirect("/organizations"))
-                .permitAll());
-        http.logout((logout) -> logout.logoutSuccessUrl("/login"));
+        // SPA 场景：cookie 里的原始 token 直接作为 X-XSRF-TOKEN 发送，因此使用明文处理器。
+        http.csrf((csrf) -> csrf
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()));
+        http.exceptionHandling((exceptions) -> exceptions
+                .defaultAuthenticationEntryPointFor(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                        (request) -> request.getRequestURI().startsWith("/api/"))
+                .defaultAuthenticationEntryPointFor(new LoginUrlAuthenticationEntryPoint("/login"),
+                        htmlRequests()));
+        // 登出改由 POST /api/auth/logout 处理，避免保留第二套表单登出端点。
+        http.logout(AbstractHttpConfigurer::disable);
         return http.build();
+    }
+
+    private static MediaTypeRequestMatcher htmlRequests() {
+        MediaTypeRequestMatcher matcher = new MediaTypeRequestMatcher(MediaType.TEXT_HTML);
+        matcher.setIgnoredMediaTypes(Set.of(MediaType.ALL));
+        return matcher;
     }
 
     @Bean
