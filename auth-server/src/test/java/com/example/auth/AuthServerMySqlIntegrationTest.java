@@ -43,19 +43,20 @@ class AuthServerMySqlIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void flywayCreatesTheThreeOAuthTables() {
+    void flywayCreatesTheOAuthTablesIncludingClientAudit() {
         Integer tables = this.jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema = DATABASE()
-                  AND table_name IN ('oauth2_registered_client', 'oauth2_authorization', 'oauth2_authorization_consent')
+                  AND table_name IN ('oauth2_registered_client', 'oauth2_authorization',
+                                     'oauth2_authorization_consent', 'oauth2_registered_client_audit')
                 """, Integer.class);
-        assertThat(tables).isEqualTo(3);
+        assertThat(tables).isEqualTo(4);
 
         Integer migrations = this.jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM flyway_schema_history
-                WHERE version IN ('1', '2', '3') AND success = 1
+                WHERE version IN ('1', '2', '3', '4') AND success = 1
                 """, Integer.class);
-        assertThat(migrations).isEqualTo(3);
+        assertThat(migrations).isEqualTo(4);
     }
 
     @Test
