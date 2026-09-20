@@ -27,6 +27,9 @@ import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
 import org.springframework.security.web.savedrequest.RequestCache;
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher;
 
+import com.example.auth.security.PlatformAdmin;
+import com.example.auth.web.ApiAccessDeniedHandler;
+
 import java.util.Map;
 import java.util.Set;
 
@@ -44,6 +47,7 @@ public class SecurityConfig {
         http.securityContext((securityContext) -> securityContext
                 .securityContextRepository(securityContextRepository));
         http.authorizeHttpRequests((authorize) -> authorize
+                .requestMatchers("/api/admin/**").hasAuthority(PlatformAdmin.AUTHORITY)
                 .requestMatchers("/", "/login", "/organizations", "/consent", "/assets/**", "/favicon.ico",
                         "/index.html",
                         "/api/auth/session", "/api/auth/login", "/error", "/actuator/health").permitAll()
@@ -53,6 +57,8 @@ public class SecurityConfig {
                 .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                 .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()));
         http.exceptionHandling((exceptions) -> exceptions
+                // 已登录但越权 → 403 JSON；匿名 → 仍然走下面的 401 入口点。
+                .accessDeniedHandler(new ApiAccessDeniedHandler())
                 .defaultAuthenticationEntryPointFor(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
                         (request) -> request.getRequestURI().startsWith("/api/"))
                 .defaultAuthenticationEntryPointFor(new LoginUrlAuthenticationEntryPoint("/login"),

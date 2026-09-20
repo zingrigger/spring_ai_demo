@@ -1,5 +1,6 @@
 package com.example.auth.security;
 
+import com.example.auth.config.AuthServerProperties;
 import com.example.auth.identity.IdentityRepository;
 import com.example.auth.identity.UserAccount;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -7,12 +8,15 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.FactorGrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -37,11 +41,16 @@ public class IdentityAuthenticationProvider implements AuthenticationProvider {
             "$2a$10$HhM6BRuECOpF8Gumpmg.YeoJB2MjC9UhFlSdpR.kZLcgUTH9hmawq";
 
     private final IdentityRepository identityRepository;
+
     private final PasswordEncoder passwordEncoder;
 
-    public IdentityAuthenticationProvider(IdentityRepository identityRepository, PasswordEncoder passwordEncoder) {
+    private final AuthServerProperties properties;
+
+    public IdentityAuthenticationProvider(IdentityRepository identityRepository, PasswordEncoder passwordEncoder,
+                                          AuthServerProperties properties) {
         this.identityRepository = identityRepository;
         this.passwordEncoder = passwordEncoder;
+        this.properties = properties;
     }
 
     @Override
@@ -70,7 +79,12 @@ public class IdentityAuthenticationProvider implements AuthenticationProvider {
                 .withAuthority(FactorGrantedAuthority.PASSWORD_AUTHORITY)
                 .issuedAt(Instant.now())
                 .build();
-        return UsernamePasswordAuthenticationToken.authenticated(principal, null, List.of(passwordFactor));
+        List<GrantedAuthority> authorities = new ArrayList<>();
+        authorities.add(passwordFactor);
+        if (this.properties.admin().accounts().contains(user.account())) {
+            authorities.add(new SimpleGrantedAuthority(PlatformAdmin.AUTHORITY));
+        }
+        return UsernamePasswordAuthenticationToken.authenticated(principal, null, authorities);
     }
 
     @Override

@@ -1,5 +1,6 @@
 package com.example.auth.security;
 
+import com.example.auth.config.AuthServerProperties;
 import com.example.auth.identity.IdentityRepository;
 import com.example.auth.identity.UserAccount;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,8 +25,13 @@ class IdentityAuthenticationProviderTest {
 
     private final IdentityRepository identityRepository = mock(IdentityRepository.class);
     private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-    private final AuthenticationProvider provider =
-            new IdentityAuthenticationProvider(this.identityRepository, this.passwordEncoder);
+    private final AuthenticationProvider provider = provider(List.of());
+
+    private AuthenticationProvider provider(List<String> admins) {
+        AuthServerProperties properties = new AuthServerProperties("http://localhost:8083", null, null, null,
+                new AuthServerProperties.Admin(admins));
+        return new IdentityAuthenticationProvider(this.identityRepository, this.passwordEncoder, properties);
+    }
 
     @Test
     void authenticatesWithTheStoredBcryptPassword() {
@@ -42,8 +49,36 @@ class IdentityAuthenticationProviderTest {
         assertThat(user.name()).isEqualTo("Alice");
         assertThat(result.getCredentials()).isNull();
         assertThat(result.getAuthorities())
-                .singleElement()
-                .isInstanceOf(FactorGrantedAuthority.class);
+                .hasSize(1)
+                .allSatisfy((authority) -> assertThat(authority).isInstanceOf(FactorGrantedAuthority.class));
+    }
+
+    @Test
+    void configuredAdminsAlsoGetThePlatformAdminAuthority() {
+        givenAccount("alice", new UserAccount(1L, "alice", "Alice",
+                this.passwordEncoder.encode("alice-password")));
+
+        Authentication result = provider(List.of("alice")).authenticate(
+                new UsernamePasswordAuthenticationToken("alice", "alice-password"));
+
+        assertThat(result.getAuthorities())
+                .extracting((authority) -> authority.getAuthority())
+                .containsExactlyInAnyOrder(
+                        FactorGrantedAuthority.PASSWORD_AUTHORITY,
+                        PlatformAdmin.AUTHORITY);
+    }
+
+    @Test
+    void nonConfiguredAccountsDoNotGetThePlatformAdminAuthority() {
+        givenAccount("alice", new UserAccount(1L, "alice", "Alice",
+                this.passwordEncoder.encode("alice-password")));
+
+        Authentication result = provider(List.of("bob")).authenticate(
+                new UsernamePasswordAuthenticationToken("alice", "alice-password"));
+
+        assertThat(result.getAuthorities())
+                .extracting((authority) -> authority.getAuthority())
+                .containsExactly(FactorGrantedAuthority.PASSWORD_AUTHORITY);
     }
 
     @Test

@@ -6,6 +6,8 @@
 # @ServiceConnection, so a test can never touch a real database.
 auth:
   issuer: http://localhost:8083
+  admin:
+    accounts: alice
   keystore:
     location: classpath:keystore/auth-server-test.p12
     password: changeit

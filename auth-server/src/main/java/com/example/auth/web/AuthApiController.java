@@ -2,6 +2,7 @@ package com.example.auth.web;
 
 import com.example.auth.security.AuthenticatedUser;
 import com.example.auth.security.OrganizationAuthorization;
+import com.example.auth.security.PlatformAdmin;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpStatus;
@@ -57,15 +58,18 @@ public class AuthApiController {
         // 读取 token 会触发 Spring Security 生成并下发 cookie，SPA 随后用它做写请求的 CSRF 头。
         csrfToken.getToken();
         if (authentication == null || !(authentication.getPrincipal() instanceof AuthenticatedUser user)) {
-            return new SessionResponse(false, null, null, null);
+            return new SessionResponse(false, null, null, null, false);
         }
         OrganizationAuthorization binding = authentication.getDetails() instanceof OrganizationAuthorization bound
                 ? bound : null;
         SavedRequest savedRequest = this.requestCache.getRequest(request, response);
+        boolean platformAdmin = authentication.getAuthorities().stream()
+                .anyMatch((authority) -> PlatformAdmin.AUTHORITY.equals(authority.getAuthority()));
         return new SessionResponse(true,
                 new UserView(user.account(), user.name()),
                 binding == null ? null : new OrganizationView(binding.orgId(), binding.orgName()),
-                savedRequest == null ? null : savedRequest.getRedirectUrl());
+                savedRequest == null ? null : savedRequest.getRedirectUrl(),
+                platformAdmin);
     }
 
     @PostMapping("/login")
@@ -101,6 +105,7 @@ public class AuthApiController {
     public record LoginResponse(String next) {
     }
 
-    public record SessionResponse(boolean authenticated, UserView user, OrganizationView organization, String pending) {
+    public record SessionResponse(boolean authenticated, UserView user, OrganizationView organization, String pending,
+                                  boolean platformAdmin) {
     }
 }

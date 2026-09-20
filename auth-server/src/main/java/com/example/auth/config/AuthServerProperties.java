@@ -1,8 +1,10 @@
 package com.example.auth.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.util.StringUtils;
 
 import java.time.Duration;
+import java.util.List;
 
 /**
  * Externalized configuration for the auth-server ({@code auth.*}).
@@ -11,11 +13,14 @@ import java.time.Duration;
  * inputs; nothing here falls back to a generated value.
  */
 @ConfigurationProperties(prefix = "auth")
-public record AuthServerProperties(String issuer, Keystore keystore, Oauth oauth, Resources resources) {
+public record AuthServerProperties(String issuer, Keystore keystore, Oauth oauth, Resources resources, Admin admin) {
 
     public AuthServerProperties {
         if (resources == null) {
             resources = new Resources("http://localhost:8081/mcp");
+        }
+        if (admin == null) {
+            admin = new Admin(List.of());
         }
     }
 
@@ -39,5 +44,16 @@ public record AuthServerProperties(String issuer, Keystore keystore, Oauth oauth
      * identifier.
      */
     public record Resources(String weatherMcp) {
+    }
+
+    /**
+     * Platform administrator accounts allowed to call {@code /api/admin/**}.
+     */
+    public record Admin(List<String> accounts) {
+
+        public Admin {
+            accounts = accounts == null ? List.of()
+                    : accounts.stream().filter(StringUtils::hasText).map(String::trim).toList();
+        }
     }
 }

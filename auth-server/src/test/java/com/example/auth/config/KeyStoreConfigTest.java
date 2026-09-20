@@ -55,6 +55,6 @@ class KeyStoreConfigTest {
 
     private static AuthServerProperties properties(String location, String password, String type, String alias) {
         return new AuthServerProperties("http://localhost:8083",
-                new AuthServerProperties.Keystore(location, password, type, alias), null, null);
+                new AuthServerProperties.Keystore(location, password, type, alias), null, null, null);
     }
 }
