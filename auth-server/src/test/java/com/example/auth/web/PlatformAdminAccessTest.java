@@ -58,9 +58,8 @@ class PlatformAdminAccessTest {
         MockHttpSession session = new MockHttpSession();
         login(session, "alice", "alice-password");
 
-        // 控制器尚未实现时是 404；关键是不能再被 401/403 拦截。
         this.mockMvc.perform(get("/api/admin/clients").session(session))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isOk());
     }
 
     @Test
