@@ -106,3 +106,17 @@ htpasswd -bnBC 10 "" '实际密钥' | tr -d ':\n' | sed 's/^/$2a$/{ }'   # 或�
 
 Spring Security 的 `DelegatingPasswordEncoder` 期望 `{bcrypt}$2a$...` 形式；写入初始化 SQL 前
 确认前缀存在。
+
+## 客户端管理验收
+
+1. `AUTH_ADMIN_ACCOUNTS=alice mvn -pl auth-server spring-boot:run`，用 alice 登录 auth-web。
+2. 首页进入“客户端管理” → 新建机器客户端（scopes 填 `weather:read`），保存弹窗里的 secret。
+3. 用该 client 走 client_credentials 取得 token：
+   `curl -u <client_id>:<secret> -d 'grant_type=client_credentials&scope=weather:read' http://localhost:8083/oauth2/token`
+4. 在详情页轮换 secret：旧 secret 立即失败，新 secret 成功。
+5. 停用客户端：token 端点返回 401；列表仍可见且可重新启用。
+6. 删除客户端：注册行消失，`oauth2_registered_client_audit` 中保留 CREATE/DISABLE/DELETE 记录。
+
+权限与错误码：未登录访问 `/api/admin/**` 返回 401；非平台管理员返回 403 `access_denied`。
+非法的 client_id、redirect URI 或 scope 返回 400 `invalid_client_metadata`，并带字段级
+`details`；重复的 client_id 返回 409 `client_id_taken`，未知客户端返回 404 `client_not_found`。

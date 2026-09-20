@@ -17,9 +17,11 @@
 | `POST /oauth2/introspect` / `POST /oauth2/revoke` | 仅限已认证客户端 |
 | `GET /userinfo` | OIDC UserInfo（需要 `openid` scope） |
 | `GET /`、`/login`、`/organizations`、`/consent` | Vue SPA 页面（转发到 `index.html`） |
+| `GET /admin/clients`、`/admin/clients/new`、`/admin/clients/{clientId}` | 平台管理员客户端管理页面（SPA 外壳，转发到 `index.html`） |
 | `GET /api/auth/session`、`POST /api/auth/login`、`POST /api/auth/logout` | SPA 登录会话 API |
 | `GET /api/organizations`、`POST /api/organizations` | 组织选择 API（单组织自动绑定） |
 | `GET /api/consent` | 授权确认页数据 API |
+| `/api/admin/clients` | 平台管理员客户端管理 API（列表/创建/编辑/轮换 secret/启停/删除） |
 | `GET /actuator/health` | 仅返回聚合状态（不包含组件明细） |
 
 ## 配置
@@ -42,8 +44,23 @@
 | `auth.oauth.id-token-ttl` | `AUTH_ID_TOKEN_TTL` | `PT10M` |
 | `auth.oauth.refresh-token-ttl` | `AUTH_REFRESH_TOKEN_TTL` | `P30D` |
 | `auth.oauth.session-idle-timeout` | `AUTH_SESSION_IDLE_TIMEOUT` | `PT30M` |
+| `auth.admin.accounts` | `AUTH_ADMIN_ACCOUNTS` | 空（无平台管理员） |
 
 外部密钥库缺失、类型错误、口令错误或 alias 不存在时应用直接启动失败，不会退回随机密钥。
+
+### 客户端管理
+
+平台管理员通过 auth-web 的 `/admin/clients` 管理 OAuth 客户端，写操作走 `/api/admin/clients`。
+管理员账号由 `AUTH_ADMIN_ACCOUNTS` 指定（逗号分隔，例如 `AUTH_ADMIN_ACCOUNTS=alice`），只有这些
+账号能访问管理 API；secret 只在创建或轮换时显示一次，库里存 `{bcrypt}` 哈希。
+
+生产客户端不再手工 INSERT `oauth2_registered_client`（V2/V3 种子仅用于本地开发）。停用与删除
+会清理该客户端的授权与同意记录；已签发的自包含 JWT 在到期前仍然有效。
+
+管理面与协议端点共用同一个仓储 schema，但走不同的读路径：协议端点在
+`ConfiguredRegisteredClients` 装饰器里过滤掉被停用的客户端，管理面直接读原始仓储，因此停用的
+客户端在管理页仍然可见、可重新启用。客户端展示类型（`web` / `machine` / `public` / `custom`）
+由 grant types 与认证方式推导。
 
 ## 本地运行
 
@@ -105,8 +122,9 @@ location ~ ^/(api|oauth2|\.well-known|userinfo|actuator)/ {
 
 ## 客户端注册
 
-`V2__seed_local_clients.sql` 只预置本地开发客户端，生产客户端由运维 SQL 注册，
-secret 只保存编码值（`{bcrypt}...`），明文通过密钥管理或部署注入：
+`V2__seed_local_clients.sql` 只预置本地开发客户端。新客户端请通过
+[客户端管理](#客户端管理) 创建，不再手工 INSERT；secret 只保存编码值（`{bcrypt}...`），
+明文只在创建或轮换时显示一次：
 
 | 客户端 | 流程 | 本地明文 secret |
 | --- | --- | --- |
