@@ -104,6 +104,78 @@ class ClientManagementServiceTest {
                         (ex) -> assertThat(ex.error()).isEqualTo("client_not_found"));
     }
 
+    @Test
+    void updateChangesFieldsAndPreservesTheSecret() {
+        this.clientManagementService.create(machineCommand("updatable-client"), ALICE);
+        String secretHash = this.rawRepository.findByClientId("updatable-client").getClientSecret();
+
+        ClientDetailView updated = this.clientManagementService.update("updatable-client",
+                new UpdateClientCommand("Renamed Client", null, null, List.of("weather:read", "profile"),
+                        null, null, null), ALICE);
+
+        assertThat(updated.clientName()).isEqualTo("Renamed Client");
+        assertThat(updated.scopes()).containsExactly("profile", "weather:read");
+        assertThat(this.rawRepository.findByClientId("updatable-client").getClientSecret()).isEqualTo(secretHash);
+        assertThat(auditCount("updatable-client", "UPDATE")).isEqualTo(1);
+    }
+
+    @Test
+    void updateRejectsPublicClientsWithClientCredentials() {
+        assertThatThrownBy(() -> this.clientManagementService.update("auth-machine",
+                new UpdateClientCommand(null, null, null, null, List.of("client_credentials"),
+                        List.of("none"), null), ALICE))
+                .isInstanceOfSatisfying(ClientManagementException.class, (ex) -> {
+                    assertThat(ex.error()).isEqualTo("invalid_client_metadata");
+                    assertThat(ex.details()).containsExactly(new ClientManagementException.Detail(
+                            "clientAuthenticationMethods", "public_client_requires_authorization_code"));
+                });
+    }
+
+    @Test
+    void rotateSecretReplacesTheStoredHash() {
+        this.clientManagementService.create(machineCommand("rotating-client"), ALICE);
+        String before = this.rawRepository.findByClientId("rotating-client").getClientSecret();
+
+        String newSecret = this.clientManagementService.rotateSecret("rotating-client", ALICE);
+        String after = this.rawRepository.findByClientId("rotating-client").getClientSecret();
+
+        assertThat(after).isNotEqualTo(before).startsWith("{bcrypt}$2a$").doesNotContain(newSecret);
+        assertThat(auditCount("rotating-client", "ROTATE_SECRET")).isEqualTo(1);
+    }
+
+    @Test
+    void disablingCleansUpAuthorizationsAndConsentsAndStaysReversible() {
+        this.clientManagementService.create(machineCommand("disabling-client"), ALICE);
+        RegisteredClient stored = this.rawRepository.findByClientId("disabling-client");
+        this.jdbcTemplate.update("""
+                INSERT INTO oauth2_authorization_consent (registered_client_id, principal_name, authorities)
+                VALUES (?, ?, ?)
+                """, stored.getId(), "1", "openid");
+
+        ClientDetailView disabled = this.clientManagementService.setEnabled("disabling-client", false, ALICE);
+
+        assertThat(disabled.enabled()).isFalse();
+        assertThat(this.clientManagementService.get("disabling-client").enabled()).isFalse();
+        assertThat(this.jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM oauth2_authorization_consent WHERE registered_client_id = ?",
+                Integer.class, stored.getId())).isZero();
+        assertThat(auditCount("disabling-client", "DISABLE")).isEqualTo(1);
+
+        ClientDetailView enabled = this.clientManagementService.setEnabled("disabling-client", true, ALICE);
+        assertThat(enabled.enabled()).isTrue();
+    }
+
+    @Test
+    void deleteRemovesTheClientButKeepsTheAudit() {
+        this.clientManagementService.create(machineCommand("deletable-client"), ALICE);
+
+        this.clientManagementService.delete("deletable-client", ALICE);
+
+        assertThat(this.rawRepository.findByClientId("deletable-client")).isNull();
+        assertThat(auditCount("deletable-client", "CREATE")).isEqualTo(1);
+        assertThat(auditCount("deletable-client", "DELETE")).isEqualTo(1);
+    }
+
     private static CreateClientCommand machineCommand(String clientId) {
         return new CreateClientCommand(clientId, clientId, "machine", List.of(), List.of(),
                 List.of("weather:read"), null);

@@ -98,6 +98,175 @@ public class ClientManagementService {
         return new CreatedClient(toDetail(saved), clientSecret);
     }
 
+    @Transactional
+    public ClientDetailView update(String clientId, UpdateClientCommand command, AuthenticatedUser actor) {
+        RegisteredClient existing = requireClient(clientId);
+        List<String> grantTypes = command.grantTypes() == null
+                ? values(existing.getAuthorizationGrantTypes(), AuthorizationGrantType::getValue)
+                : normalizeGrantTypes(command.grantTypes());
+        List<String> authenticationMethods = command.clientAuthenticationMethods() == null
+                ? values(existing.getClientAuthenticationMethods(), ClientAuthenticationMethod::getValue)
+                : normalizeAuthenticationMethods(command.clientAuthenticationMethods());
+        validateCombination(grantTypes, authenticationMethods);
+        List<String> redirectUris = validateUris(command.redirectUris() == null
+                ? List.copyOf(existing.getRedirectUris()) : command.redirectUris(), "redirectUris");
+        List<String> postLogoutRedirectUris = validateUris(command.postLogoutRedirectUris() == null
+                ? List.copyOf(existing.getPostLogoutRedirectUris()) : command.postLogoutRedirectUris(),
+                "postLogoutRedirectUris");
+        List<String> scopes = command.scopes() == null
+                ? List.copyOf(existing.getScopes()) : validateScopes(command.scopes());
+        if (grantTypes.contains(AuthorizationGrantType.AUTHORIZATION_CODE.getValue()) && redirectUris.isEmpty()) {
+            throw invalid("redirectUris", "required");
+        }
+        boolean requireProofKey = authenticationMethods.contains(ClientAuthenticationMethod.NONE.getValue())
+                || existing.getClientSettings().isRequireProofKey();
+        boolean requireConsent = command.requireAuthorizationConsent() == null
+                ? existing.getClientSettings().isRequireAuthorizationConsent()
+                : command.requireAuthorizationConsent();
+
+        ClientSettings.Builder settings = ClientSettings.withSettings(existing.getClientSettings().getSettings());
+        settings.requireProofKey(requireProofKey);
+        settings.requireAuthorizationConsent(requireConsent);
+
+        RegisteredClient.Builder builder = RegisteredClient.from(existing)
+                .clientName(command.clientName() == null ? existing.getClientName() : command.clientName())
+                .redirectUris((uris) -> {
+                    uris.clear();
+                    uris.addAll(redirectUris);
+                })
+                .postLogoutRedirectUris((uris) -> {
+                    uris.clear();
+                    uris.addAll(postLogoutRedirectUris);
+                })
+                .scopes((values) -> {
+                    values.clear();
+                    values.addAll(scopes);
+                })
+                .authorizationGrantTypes((values) -> {
+                    values.clear();
+                    grantTypes.forEach((value) -> values.add(new AuthorizationGrantType(value)));
+                })
+                .clientAuthenticationMethods((values) -> {
+                    values.clear();
+                    authenticationMethods.forEach((value) -> values.add(new ClientAuthenticationMethod(value)));
+                })
+                .clientSettings(settings.build());
+        if (authenticationMethods.contains(ClientAuthenticationMethod.NONE.getValue())) {
+            builder.clientSecret(null);
+        }
+        RegisteredClient updated = builder.build();
+        this.registeredClientRepository.save(updated);
+        this.clientAuditRepository.record(existing.getId(), existing.getClientId(), AuditAction.UPDATE, actor,
+                changedFields(command));
+        return toDetail(updated);
+    }
+
+    @Transactional
+    public String rotateSecret(String clientId, AuthenticatedUser actor) {
+        RegisteredClient existing = requireClient(clientId);
+        if (existing.getClientAuthenticationMethods().contains(ClientAuthenticationMethod.NONE)) {
+            throw invalid("clientAuthenticationMethods", "public_client_has_no_secret");
+        }
+        String clientSecret = generateSecret();
+        RegisteredClient updated = RegisteredClient.from(existing)
+                .clientSecret(this.passwordEncoder.encode(clientSecret))
+                .build();
+        this.registeredClientRepository.save(updated);
+        this.clientAuditRepository.record(existing.getId(), clientId, AuditAction.ROTATE_SECRET, actor, List.of());
+        return clientSecret;
+    }
+
+    @Transactional
+    public ClientDetailView setEnabled(String clientId, boolean enabled, AuthenticatedUser actor) {
+        RegisteredClient existing = requireClient(clientId);
+        RegisteredClient updated = ClientManagementSettings.withEnabled(existing, enabled);
+        this.registeredClientRepository.save(updated);
+        if (!enabled) {
+            this.clientQueryRepository.deleteAuthorizationsAndConsents(existing.getId());
+        }
+        this.clientAuditRepository.record(existing.getId(), clientId,
+                enabled ? AuditAction.ENABLE : AuditAction.DISABLE, actor, List.of());
+        return toDetail(updated);
+    }
+
+    @Transactional
+    public void delete(String clientId, AuthenticatedUser actor) {
+        RegisteredClient existing = requireClient(clientId);
+        this.clientQueryRepository.deleteAuthorizationsAndConsents(existing.getId());
+        this.clientQueryRepository.deleteRegisteredClient(existing.getId());
+        this.clientAuditRepository.record(existing.getId(), clientId, AuditAction.DELETE, actor, List.of());
+    }
+
+    private static List<String> normalizeGrantTypes(List<String> grantTypes) {
+        List<String> allowed = List.of("authorization_code", "client_credentials", "refresh_token");
+        List<String> normalized = new ArrayList<>();
+        for (String value : grantTypes) {
+            if (value == null || !allowed.contains(value)) {
+                throw invalid("grantTypes", "unsupported");
+            }
+            if (!normalized.contains(value)) {
+                normalized.add(value);
+            }
+        }
+        if (normalized.isEmpty()) {
+            throw invalid("grantTypes", "required");
+        }
+        return List.copyOf(normalized);
+    }
+
+    private static List<String> normalizeAuthenticationMethods(List<String> authenticationMethods) {
+        List<String> allowed = List.of("client_secret_basic", "client_secret_post", "none");
+        List<String> normalized = new ArrayList<>();
+        for (String value : authenticationMethods) {
+            if (value == null || !allowed.contains(value)) {
+                throw invalid("clientAuthenticationMethods", "unsupported");
+            }
+            if (!normalized.contains(value)) {
+                normalized.add(value);
+            }
+        }
+        if (normalized.isEmpty()) {
+            throw invalid("clientAuthenticationMethods", "required");
+        }
+        return List.copyOf(normalized);
+    }
+
+    private static void validateCombination(List<String> grantTypes, List<String> authenticationMethods) {
+        if (authenticationMethods.contains(ClientAuthenticationMethod.NONE.getValue())) {
+            boolean onlyAuthorizationCode = grantTypes.size() == 1
+                    && grantTypes.contains(AuthorizationGrantType.AUTHORIZATION_CODE.getValue());
+            if (!onlyAuthorizationCode) {
+                throw invalid("clientAuthenticationMethods", "public_client_requires_authorization_code");
+            }
+        }
+    }
+
+    private static List<String> changedFields(UpdateClientCommand command) {
+        List<String> fields = new ArrayList<>();
+        if (command.clientName() != null) {
+            fields.add("clientName");
+        }
+        if (command.redirectUris() != null) {
+            fields.add("redirectUris");
+        }
+        if (command.postLogoutRedirectUris() != null) {
+            fields.add("postLogoutRedirectUris");
+        }
+        if (command.scopes() != null) {
+            fields.add("scopes");
+        }
+        if (command.grantTypes() != null) {
+            fields.add("grantTypes");
+        }
+        if (command.clientAuthenticationMethods() != null) {
+            fields.add("clientAuthenticationMethods");
+        }
+        if (command.requireAuthorizationConsent() != null) {
+            fields.add("requireAuthorizationConsent");
+        }
+        return fields;
+    }
+
     private RegisteredClient.Builder clientBuilder(String clientId, String clientName, String type,
                                                   List<String> redirectUris, List<String> postLogoutRedirectUris,
                                                   List<String> scopes, boolean requireConsent) {
@@ -156,7 +325,7 @@ public class ClientManagementService {
                 values(client.getAuthorizationGrantTypes(), AuthorizationGrantType::getValue),
                 List.copyOf(client.getRedirectUris()),
                 List.copyOf(client.getPostLogoutRedirectUris()),
-                List.copyOf(client.getScopes()),
+                sorted(client.getScopes()),
                 client.getClientSettings().isRequireProofKey(),
                 client.getClientSettings().isRequireAuthorizationConsent(),
                 client.getClientIdIssuedAt(),
@@ -172,6 +341,13 @@ public class ClientManagementService {
 
     private static <T> List<String> values(Collection<T> source, Function<T, String> mapper) {
         return source.stream().map(mapper).toList();
+    }
+
+    /**
+     * 框架用 HashSet 保存 scopes，顺序不稳定；读模型统一按字典序输出，便于比对与展示。
+     */
+    private static List<String> sorted(Collection<String> values) {
+        return values.stream().filter((value) -> value != null).sorted().toList();
     }
 
     private static void validateClientId(String clientId) {
