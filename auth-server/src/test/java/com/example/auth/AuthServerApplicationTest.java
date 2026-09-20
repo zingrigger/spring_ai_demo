@@ -6,11 +6,14 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService;
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
+import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.Duration;
 
+import com.example.auth.clientadmin.ClientAuditRepository;
+import com.example.auth.clientadmin.ClientQueryRepository;
 import com.example.auth.identity.IdentityRepository;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -30,10 +33,19 @@ class AuthServerApplicationTest {
     private RegisteredClientRepository registeredClientRepository;
 
     @MockitoBean
+    private JdbcRegisteredClientRepository jdbcRegisteredClientRepository;
+
+    @MockitoBean
     private OAuth2AuthorizationService authorizationService;
 
     @MockitoBean
     private OAuth2AuthorizationConsentService authorizationConsentService;
+
+    @MockitoBean
+    private ClientQueryRepository clientQueryRepository;
+
+    @MockitoBean
+    private ClientAuditRepository clientAuditRepository;
 
     @Value("${spring.application.name}")
     private String applicationName;

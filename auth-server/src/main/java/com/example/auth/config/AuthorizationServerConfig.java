@@ -9,6 +9,7 @@ import com.nimbusds.jose.jwk.source.JWKSource;
 import com.nimbusds.jose.proc.SecurityContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -74,9 +75,19 @@ public class AuthorizationServerConfig {
     }
 
     @Bean
-    RegisteredClientRepository registeredClientRepository(JdbcTemplate jdbcTemplate,
-                                                          AuthServerProperties properties) {
-        return new ConfiguredRegisteredClients(new JdbcRegisteredClientRepository(jdbcTemplate), properties);
+    JdbcRegisteredClientRepository jdbcRegisteredClientRepository(JdbcTemplate jdbcTemplate) {
+        return new JdbcRegisteredClientRepository(jdbcTemplate);
+    }
+
+    /**
+     * 协议端点使用带 TTL 覆盖与禁用过滤的装饰器；管理面直接注入原始仓储，
+     * 这样被停用的客户端在管理页仍然可见、可重新启用。
+     */
+    @Bean
+    @Primary
+    RegisteredClientRepository registeredClientRepository(
+            JdbcRegisteredClientRepository jdbcRegisteredClientRepository, AuthServerProperties properties) {
+        return new ConfiguredRegisteredClients(jdbcRegisteredClientRepository, properties);
     }
 
     @Bean

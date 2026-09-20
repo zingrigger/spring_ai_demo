@@ -1,5 +1,6 @@
 package com.example.auth.config;
 
+import com.example.auth.clientadmin.ClientManagementSettings;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;
@@ -37,7 +38,7 @@ public class ConfiguredRegisteredClients implements RegisteredClientRepository {
     }
 
     private RegisteredClient withConfiguredLifetimes(RegisteredClient registeredClient) {
-        if (registeredClient == null) {
+        if (registeredClient == null || !ClientManagementSettings.isEnabled(registeredClient)) {
             return null;
         }
         AuthServerProperties.Oauth configured = this.properties.oauth();
