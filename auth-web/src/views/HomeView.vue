@@ -34,6 +34,10 @@ async function signOut(): Promise<void> {
           <dd class="text-sm font-semibold text-slate-900">{{ session.organization?.name ?? '—' }}</dd>
         </div>
       </dl>
+      <RouterLink v-if="session?.platformAdmin" to="/admin/clients"
+                  class="rounded-lg bg-indigo-600 px-4 py-2 text-center text-sm font-semibold text-white transition hover:bg-indigo-500">
+        {{ t('clientAdmin.list.entry') }}
+      </RouterLink>
       <button type="button"
               class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               @click="signOut">

@@ -31,6 +31,24 @@ export default {
     organization: '组织',
     logout: '退出登录',
   },
+  clientAdmin: {
+    enabled: '已启用',
+    disabled: '已停用',
+    type: { web: 'Web 应用', machine: '机器客户端', public: '公共客户端', custom: '自定义' },
+    errors: { denied: '需要平台管理员权限。', failed: '加载失败，请稍后重试。' },
+    list: {
+      title: '客户端管理',
+      subtitle: '管理授权服务器的 OAuth 客户端',
+      search: '按 client_id 或名称搜索',
+      searchAction: '搜索',
+      create: '新建客户端',
+      entry: '客户端管理',
+      columns: {
+        clientId: 'Client ID', name: '名称', type: '类型', grantTypes: '授权类型',
+        scopes: 'Scopes', status: '状态', updatedBy: '最近操作人',
+      },
+    },
+  },
   scope: {
     profile: '读取基本资料',
     weatherRead: '读取天气数据',

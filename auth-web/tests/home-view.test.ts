@@ -49,4 +49,30 @@ describe('HomeView', () => {
     expect(logout).toHaveBeenCalled()
     expect(navigate).toHaveBeenCalledWith('/login')
   })
+
+  it('shows the client management entry only for platform admins', async () => {
+    vi.mocked(getSession).mockResolvedValue({
+      authenticated: true,
+      user: { account: 'alice', name: 'Alice' },
+      organization: { id: 10, name: 'Alpha' },
+      pending: null,
+      platformAdmin: true,
+    })
+    const adminWrapper = mount(HomeView, {
+      global: { plugins: [i18n], stubs: { RouterLink: { template: '<a><slot /></a>' } } },
+    })
+    await flushPromises()
+    expect(adminWrapper.text()).toContain('客户端管理')
+
+    vi.mocked(getSession).mockResolvedValue({
+      authenticated: true,
+      user: { account: 'alice', name: 'Alice' },
+      organization: { id: 10, name: 'Alpha' },
+      pending: null,
+      platformAdmin: false,
+    })
+    const userWrapper = mount(HomeView, { global: { plugins: [i18n] } })
+    await flushPromises()
+    expect(userWrapper.text()).not.toContain('客户端管理')
+  })
 })

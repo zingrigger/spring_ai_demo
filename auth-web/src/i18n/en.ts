@@ -31,6 +31,24 @@ export default {
     organization: 'Organization',
     logout: 'Sign out',
   },
+  clientAdmin: {
+    enabled: 'Enabled',
+    disabled: 'Disabled',
+    type: { web: 'Web app', machine: 'Machine client', public: 'Public client', custom: 'Custom' },
+    errors: { denied: 'Platform administrator permission required.', failed: 'Could not load. Please retry.' },
+    list: {
+      title: 'Client management',
+      subtitle: 'Manage the OAuth clients of this authorization server',
+      search: 'Search by client_id or name',
+      searchAction: 'Search',
+      create: 'New client',
+      entry: 'Clients',
+      columns: {
+        clientId: 'Client ID', name: 'Name', type: 'Type', grantTypes: 'Grant types',
+        scopes: 'Scopes', status: 'Status', updatedBy: 'Last updated by',
+      },
+    },
+  },
   scope: {
     profile: 'Read your basic profile',
     weatherRead: 'Read weather data',
