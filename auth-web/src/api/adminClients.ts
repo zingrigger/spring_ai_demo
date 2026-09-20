@@ -56,6 +56,7 @@ export interface UpdateClientPayload {
   grantTypes: string[]
   clientAuthenticationMethods: string[]
   requireAuthorizationConsent: boolean
+  requireProofKey: boolean
 }
 
 export interface CreatedClient {

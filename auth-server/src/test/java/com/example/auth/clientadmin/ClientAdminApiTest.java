@@ -24,6 +24,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -100,6 +101,25 @@ class ClientAdminApiTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.error").value("invalid_client_metadata"))
                 .andExpect(jsonPath("$.details[0].field").value("clientId"));
+    }
+
+    @Test
+    void updateCanDisablePkceForConfidentialClients() throws Exception {
+        MockHttpSession session = adminSession();
+        this.mockMvc.perform(post("/api/admin/clients").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"clientId":"pkce-api-client","clientName":"PKCE API","type":"web",
+                                 "redirectUris":["https://example.com/callback"],"scopes":["openid"]}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.client.requireProofKey").value(true));
+
+        this.mockMvc.perform(put("/api/admin/clients/pkce-api-client").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"requireProofKey\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requireProofKey").value(false));
     }
 
     @Test

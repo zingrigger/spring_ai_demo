@@ -1,6 +1,6 @@
 package com.example.auth.config;
 
-import com.example.auth.clientadmin.ClientManagementSettings;
+import com.example.auth.client.ClientManagementSettings;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient;
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository;
 import org.springframework.security.oauth2.server.authorization.settings.TokenSettings;

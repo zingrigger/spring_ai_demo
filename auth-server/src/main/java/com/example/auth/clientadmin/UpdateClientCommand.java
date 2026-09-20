@@ -7,5 +7,6 @@ import java.util.List;
  */
 public record UpdateClientCommand(String clientName, List<String> redirectUris, List<String> postLogoutRedirectUris,
                                   List<String> scopes, List<String> grantTypes,
-                                  List<String> clientAuthenticationMethods, Boolean requireAuthorizationConsent) {
+                                  List<String> clientAuthenticationMethods, Boolean requireAuthorizationConsent,
+                                  Boolean requireProofKey) {
 }

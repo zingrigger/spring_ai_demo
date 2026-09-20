@@ -111,7 +111,7 @@ class ClientManagementServiceTest {
 
         ClientDetailView updated = this.clientManagementService.update("updatable-client",
                 new UpdateClientCommand("Renamed Client", null, null, List.of("weather:read", "profile"),
-                        null, null, null), ALICE);
+                        null, null, null, null), ALICE);
 
         assertThat(updated.clientName()).isEqualTo("Renamed Client");
         assertThat(updated.scopes()).containsExactly("profile", "weather:read");
@@ -123,11 +123,40 @@ class ClientManagementServiceTest {
     void updateRejectsPublicClientsWithClientCredentials() {
         assertThatThrownBy(() -> this.clientManagementService.update("auth-machine",
                 new UpdateClientCommand(null, null, null, null, List.of("client_credentials"),
-                        List.of("none"), null), ALICE))
+                        List.of("none"), null, null), ALICE))
                 .isInstanceOfSatisfying(ClientManagementException.class, (ex) -> {
                     assertThat(ex.error()).isEqualTo("invalid_client_metadata");
                     assertThat(ex.details()).containsExactly(new ClientManagementException.Detail(
                             "clientAuthenticationMethods", "public_client_requires_authorization_code"));
+                });
+    }
+
+    @Test
+    void updateCanDisablePkceForConfidentialClients() {
+        this.clientManagementService.create(new CreateClientCommand("pkce-client", "PKCE Client", "web",
+                List.of("https://example.com/callback"), List.of(), List.of("openid"), null), ALICE);
+        assertThat(this.clientManagementService.get("pkce-client").requireProofKey()).isTrue();
+
+        ClientDetailView updated = this.clientManagementService.update("pkce-client",
+                new UpdateClientCommand(null, null, null, null, null, null, null, false), ALICE);
+
+        assertThat(updated.requireProofKey()).isFalse();
+        assertThat(this.rawRepository.findByClientId("pkce-client").getClientSettings().isRequireProofKey())
+                .isFalse();
+        assertThat(auditCount("pkce-client", "UPDATE")).isEqualTo(1);
+    }
+
+    @Test
+    void updateRejectsDisablingPkceForPublicClients() {
+        this.clientManagementService.create(new CreateClientCommand("public-pkce-client", "Public PKCE", "public",
+                List.of("https://example.com/callback"), List.of(), List.of("openid"), null), ALICE);
+
+        assertThatThrownBy(() -> this.clientManagementService.update("public-pkce-client",
+                new UpdateClientCommand(null, null, null, null, null, null, null, false), ALICE))
+                .isInstanceOfSatisfying(ClientManagementException.class, (ex) -> {
+                    assertThat(ex.error()).isEqualTo("invalid_client_metadata");
+                    assertThat(ex.details()).containsExactly(new ClientManagementException.Detail(
+                            "requireProofKey", "public_client_requires_pkce"));
                 });
     }
 

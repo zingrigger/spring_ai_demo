@@ -66,11 +66,16 @@ describe('ClientDetailView', () => {
 
     expect(wrapper.text()).toContain('Auth Machine')
     await wrapper.get('[data-field="clientName"]').setValue('Renamed Machine')
+    await wrapper.get('[data-field="requireProofKey"]').setValue(true)
     await wrapper.get('form').trigger('submit')
     await flushPromises()
 
     expect(updateClient).toHaveBeenCalledWith('auth-machine',
-      expect.objectContaining({ clientName: 'Renamed Machine', scopes: ['weather:read'] }))
+      expect.objectContaining({
+        clientName: 'Renamed Machine',
+        scopes: ['weather:read'],
+        requireProofKey: true,
+      }))
   })
 
   it('rotates the secret and shows the new value', async () => {

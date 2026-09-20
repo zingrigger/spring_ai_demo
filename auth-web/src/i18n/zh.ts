@@ -77,6 +77,7 @@ export default {
       redirectUris: 'Redirect URIs（每行一个）',
       postLogoutRedirectUris: 'Post-logout redirect URIs（每行一个）',
       scopes: 'Scopes（空格或逗号分隔）',
+      requireProofKey: '要求 PKCE',
       save: '保存',
       dangerTitle: '危险操作',
       dangerHint: '停用或删除会立即停止新令牌签发，但已签发的访问令牌在到期前仍然有效。',

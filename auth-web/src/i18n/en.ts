@@ -77,6 +77,7 @@ export default {
       redirectUris: 'Redirect URIs (one per line)',
       postLogoutRedirectUris: 'Post-logout redirect URIs (one per line)',
       scopes: 'Scopes (space or comma separated)',
+      requireProofKey: 'Require PKCE',
       save: 'Save',
       dangerTitle: 'Danger zone',
       dangerHint: 'Disabling or deleting stops new tokens immediately, but already issued access tokens stay valid until they expire.',

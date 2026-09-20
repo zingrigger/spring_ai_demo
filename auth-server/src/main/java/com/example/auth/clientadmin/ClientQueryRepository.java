@@ -1,5 +1,6 @@
 package com.example.auth.clientadmin;
 
+import com.example.auth.client.ClientManagementSettings;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import AuthLayout from '../../components/AuthLayout.vue'
@@ -33,7 +33,10 @@ const form = reactive({
   grantTypes: [] as string[],
   clientAuthenticationMethods: [] as string[],
   requireAuthorizationConsent: true,
+  requireProofKey: true,
 })
+
+const publicClient = computed(() => form.clientAuthenticationMethods.includes('none'))
 
 function splitLines(value: string): string[] {
   return value.split('\n').map((line) => line.trim()).filter((line) => line.length > 0)
@@ -55,6 +58,7 @@ async function load(): Promise<void> {
     form.grantTypes = [...detail.grantTypes]
     form.clientAuthenticationMethods = [...detail.clientAuthenticationMethods]
     form.requireAuthorizationConsent = detail.requireAuthorizationConsent
+    form.requireProofKey = detail.requireProofKey
   } catch (e) {
     error.value = e instanceof ApiError && e.status === 404 ? 'notFound' : 'failed'
   }
@@ -72,6 +76,7 @@ async function save(): Promise<void> {
       grantTypes: form.grantTypes,
       clientAuthenticationMethods: form.clientAuthenticationMethods,
       requireAuthorizationConsent: form.requireAuthorizationConsent,
+      requireProofKey: form.requireProofKey,
     }
     client.value = await updateClient(clientId, payload)
   } catch (e) {
@@ -143,6 +148,11 @@ onMounted(load)
           <span class="font-semibold text-slate-700">{{ t('clientAdmin.detail.scopes') }}</span>
           <input v-model="form.scopes" data-field="scopes"
                  class="rounded-lg border border-slate-300 px-3 py-2" />
+        </label>
+        <label class="flex items-center gap-2 text-sm">
+          <input v-model="form.requireProofKey" data-field="requireProofKey" type="checkbox"
+                 :disabled="publicClient" class="h-4 w-4 rounded border-slate-300" />
+          <span class="font-semibold text-slate-700">{{ t('clientAdmin.detail.requireProofKey') }}</span>
         </label>
         <button type="submit" data-action="save" :disabled="saving"
                 class="justify-self-start rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-60">

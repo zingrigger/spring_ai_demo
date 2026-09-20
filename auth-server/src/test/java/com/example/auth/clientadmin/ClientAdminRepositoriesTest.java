@@ -1,5 +1,6 @@
 package com.example.auth.clientadmin;
 
+import com.example.auth.client.ClientManagementSettings;
 import com.example.auth.security.AuthenticatedUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

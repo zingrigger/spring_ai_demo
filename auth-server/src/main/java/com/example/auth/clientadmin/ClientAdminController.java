@@ -112,11 +112,12 @@ public class ClientAdminController {
     public record UpdateClientRequest(String clientName, List<String> redirectUris,
                                       List<String> postLogoutRedirectUris, List<String> scopes,
                                       List<String> grantTypes, List<String> clientAuthenticationMethods,
-                                      Boolean requireAuthorizationConsent) {
+                                      Boolean requireAuthorizationConsent, Boolean requireProofKey) {
 
         UpdateClientCommand toCommand() {
             return new UpdateClientCommand(this.clientName, this.redirectUris, this.postLogoutRedirectUris,
-                    this.scopes, this.grantTypes, this.clientAuthenticationMethods, this.requireAuthorizationConsent);
+                    this.scopes, this.grantTypes, this.clientAuthenticationMethods,
+                    this.requireAuthorizationConsent, this.requireProofKey);
         }
     }
 

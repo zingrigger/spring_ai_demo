@@ -1,5 +1,6 @@
 package com.example.auth.clientadmin;
 
+import com.example.auth.client.ClientManagementSettings;
 import com.example.auth.config.AuthServerProperties;
 import com.example.auth.security.AuthenticatedUser;
 import org.springframework.http.HttpStatus;
@@ -118,8 +119,12 @@ public class ClientManagementService {
         if (grantTypes.contains(AuthorizationGrantType.AUTHORIZATION_CODE.getValue()) && redirectUris.isEmpty()) {
             throw invalid("redirectUris", "required");
         }
-        boolean requireProofKey = authenticationMethods.contains(ClientAuthenticationMethod.NONE.getValue())
-                || existing.getClientSettings().isRequireProofKey();
+        boolean publicClient = authenticationMethods.contains(ClientAuthenticationMethod.NONE.getValue());
+        if (publicClient && Boolean.FALSE.equals(command.requireProofKey())) {
+            throw invalid("requireProofKey", "public_client_requires_pkce");
+        }
+        boolean requireProofKey = publicClient || (command.requireProofKey() == null
+                ? existing.getClientSettings().isRequireProofKey() : command.requireProofKey());
         boolean requireConsent = command.requireAuthorizationConsent() == null
                 ? existing.getClientSettings().isRequireAuthorizationConsent()
                 : command.requireAuthorizationConsent();
@@ -263,6 +268,9 @@ public class ClientManagementService {
         }
         if (command.requireAuthorizationConsent() != null) {
             fields.add("requireAuthorizationConsent");
+        }
+        if (command.requireProofKey() != null) {
+            fields.add("requireProofKey");
         }
         return fields;
     }
