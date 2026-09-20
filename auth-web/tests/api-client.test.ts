@@ -38,6 +38,19 @@ describe('api client', () => {
     await expect(api('/api/auth/login', { method: 'POST', body: '{}' })).rejects.toBeInstanceOf(ApiError)
   })
 
+  it('keeps field level error details', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({
+      error: 'invalid_client_metadata',
+      details: [{ field: 'redirectUris', code: 'invalid_uri' }],
+    }), { status: 400 }))
+
+    await expect(api('/api/admin/clients', { method: 'POST', body: '{}' })).rejects.toMatchObject({
+      status: 400,
+      code: 'invalid_client_metadata',
+      details: [{ field: 'redirectUris', code: 'invalid_uri' }],
+    })
+  })
+
   it('resolves undefined for empty 204 responses', async () => {
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 204 }))
 
