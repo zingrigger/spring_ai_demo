@@ -5,7 +5,7 @@ import { navigate } from './navigation'
 export type GuardResult = boolean | { path: string }
 
 /**
- * 会话守卫：未登录去 /login；已登录未绑定组织去 /organizations；
+ * 会话守卫：未登录去 /login；平台管理员放行 /admin/**；其余用户先绑定组织；
  * 已有待处理授权请求时（仅在 / 与 /login 上）恢复该请求，避免打断组织与 consent 步骤。
  */
 export function createSessionGuard(load: () => Promise<SessionState>) {
@@ -13,6 +13,9 @@ export function createSessionGuard(load: () => Promise<SessionState>) {
     const session = await load()
     if (!session.authenticated) {
       return to.path === '/login' ? true : { path: '/login' }
+    }
+    if (to.path.startsWith('/admin')) {
+      return session.platformAdmin ? true : { path: '/' }
     }
     if (!session.organization) {
       return to.path === '/organizations' ? true : { path: '/organizations' }
@@ -35,6 +38,9 @@ export const router = createRouter({
     { path: '/login', component: () => import('./views/LoginView.vue') },
     { path: '/organizations', component: () => import('./views/OrganizationsView.vue') },
     { path: '/consent', component: () => import('./views/ConsentView.vue') },
+    { path: '/admin/clients', component: () => import('./views/admin/ClientListView.vue') },
+    { path: '/admin/clients/new', component: () => import('./views/admin/ClientCreateView.vue') },
+    { path: '/admin/clients/:clientId', component: () => import('./views/admin/ClientDetailView.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

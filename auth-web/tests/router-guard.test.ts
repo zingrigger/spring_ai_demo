@@ -11,6 +11,7 @@ function session(overrides: Partial<SessionState> = {}): SessionState {
     user: { account: 'alice', name: 'Alice' },
     organization: { id: 10, name: 'Alpha' },
     pending: null,
+    platformAdmin: false,
     ...overrides,
   }
 }
@@ -49,5 +50,17 @@ describe('session guard', () => {
     expect(await guard(route('/login'))).toEqual({ path: '/' })
     expect(await guard(route('/organizations'))).toEqual({ path: '/' })
     expect(await guard(route('/consent'))).toBe(true)
+  })
+
+  it('lets platform admins reach the admin routes without an organization', async () => {
+    const guard = createSessionGuard(async () => session({ platformAdmin: true, organization: null }))
+
+    expect(await guard(route('/admin/clients'))).toBe(true)
+  })
+
+  it('sends non-admins away from the admin routes', async () => {
+    const guard = createSessionGuard(async () => session())
+
+    expect(await guard(route('/admin/clients'))).toEqual({ path: '/' })
   })
 })

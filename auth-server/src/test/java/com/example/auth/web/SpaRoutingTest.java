@@ -40,7 +40,8 @@ class SpaRoutingTest {
 
     @Test
     void clientRoutesForwardToTheSpaShell() throws Exception {
-        for (String path : List.of("/", "/login", "/organizations", "/consent")) {
+        for (String path : List.of("/", "/login", "/organizations", "/consent",
+                "/admin/clients", "/admin/clients/new", "/admin/clients/auth-machine")) {
             this.mockMvc.perform(get(path))
                     .andExpect(status().isOk())
                     .andExpect(forwardedUrl("/index.html"))

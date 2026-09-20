@@ -11,7 +11,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class SpaForwardController {
 
-    @GetMapping({"/", "/login", "/organizations", "/consent"})
+    @GetMapping({"/", "/login", "/organizations", "/consent", "/admin/clients", "/admin/clients/new",
+            "/admin/clients/{clientId}"})
     String spa(HttpServletResponse response) {
         response.setHeader(HttpHeaders.CACHE_CONTROL, "no-cache");
         return "forward:/index.html";

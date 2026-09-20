@@ -22,6 +22,7 @@ describe('HomeView', () => {
       user: { account: 'alice', name: 'Alice' },
       organization: { id: 10, name: 'Alpha' },
       pending: null,
+      platformAdmin: false,
     })
     const wrapper = mount(HomeView, { global: { plugins: [i18n] } })
     await flushPromises()
@@ -36,6 +37,7 @@ describe('HomeView', () => {
       user: { account: 'alice', name: 'Alice' },
       organization: { id: 10, name: 'Alpha' },
       pending: null,
+      platformAdmin: false,
     })
     vi.mocked(logout).mockResolvedValue()
     const wrapper = mount(HomeView, { global: { plugins: [i18n] } })

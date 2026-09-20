@@ -15,6 +15,7 @@ export interface SessionState {
   user: UserView | null
   organization: OrganizationView | null
   pending: string | null
+  platformAdmin: boolean
 }
 
 export interface ConsentState {
