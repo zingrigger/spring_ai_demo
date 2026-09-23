@@ -58,6 +58,14 @@ describe('session guard', () => {
     expect(await guard(route('/admin/clients'))).toBe(true)
   })
 
+  it('keeps organization-less platform admins on the home route', async () => {
+    const guard = createSessionGuard(async () => session({ platformAdmin: true, organization: null }))
+
+    expect(await guard(route('/'))).toBe(true)
+    expect(await guard(route('/login'))).toEqual({ path: '/' })
+    expect(await guard(route('/organizations'))).toBe(true)
+  })
+
   it('sends non-admins away from the admin routes', async () => {
     const guard = createSessionGuard(async () => session())
 

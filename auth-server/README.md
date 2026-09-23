@@ -53,6 +53,9 @@
 平台管理员通过 auth-web 的 `/admin/clients` 管理 OAuth 客户端，写操作走 `/api/admin/clients`。
 管理员账号由 `AUTH_ADMIN_ACCOUNTS` 指定（逗号分隔，例如 `AUTH_ADMIN_ACCOUNTS=alice`），只有这些
 账号能访问管理 API；secret 只在创建或轮换时显示一次，库里存 `{bcrypt}` 哈希。
+平台管理员可以是无组织账号（平台级角色不来自 `sys_user_org_role`）：这类账号登录后直接进入
+首页，不受组织绑定影响，未配置在 `AUTH_ADMIN_ACCOUNTS` 里的账号访问 `/admin/**` 会被送回
+组织选择页。
 
 生产客户端不再手工 INSERT `oauth2_registered_client`（V2/V3 种子仅用于本地开发）。停用与删除
 会清理该客户端的授权与同意记录；已签发的自包含 JWT 在到期前仍然有效。

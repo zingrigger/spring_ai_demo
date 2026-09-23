@@ -1,5 +1,6 @@
 package com.example.auth.web;
 
+import com.example.auth.identity.IdentityRepository;
 import com.example.auth.security.AuthenticatedUser;
 import com.example.auth.security.OrganizationAuthorization;
 import com.example.auth.security.PlatformAdmin;
@@ -42,14 +43,18 @@ public class AuthApiController {
 
     private final RequestCache requestCache;
 
+    private final IdentityRepository identityRepository;
+
     public AuthApiController(AuthenticationManager authenticationManager,
                              SecurityContextRepository securityContextRepository,
                              SessionAuthenticationStrategy sessionAuthenticationStrategy,
-                             RequestCache requestCache) {
+                             RequestCache requestCache,
+                             IdentityRepository identityRepository) {
         this.authenticationManager = authenticationManager;
         this.securityContextRepository = securityContextRepository;
         this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
         this.requestCache = requestCache;
+        this.identityRepository = identityRepository;
     }
 
     @GetMapping("/session")
@@ -63,13 +68,11 @@ public class AuthApiController {
         OrganizationAuthorization binding = authentication.getDetails() instanceof OrganizationAuthorization bound
                 ? bound : null;
         SavedRequest savedRequest = this.requestCache.getRequest(request, response);
-        boolean platformAdmin = authentication.getAuthorities().stream()
-                .anyMatch((authority) -> PlatformAdmin.AUTHORITY.equals(authority.getAuthority()));
         return new SessionResponse(true,
                 new UserView(user.account(), user.name()),
                 binding == null ? null : new OrganizationView(binding.orgId(), binding.orgName()),
                 savedRequest == null ? null : savedRequest.getRedirectUrl(),
-                platformAdmin);
+                isPlatformAdmin(authentication));
     }
 
     @PostMapping("/login")
@@ -90,7 +93,7 @@ public class AuthApiController {
         SecurityContextHolder.setContext(context);
         this.securityContextRepository.saveContext(context, request, response);
         // 组织绑定总是紧跟登录，saved request 留在 session 里由组织接口继续消费。
-        return ResponseEntity.ok(new LoginResponse("/organizations"));
+        return ResponseEntity.ok(new LoginResponse(nextStep(authentication)));
     }
 
     @PostMapping("/logout")
@@ -107,5 +110,23 @@ public class AuthApiController {
 
     public record SessionResponse(boolean authenticated, UserView user, OrganizationView organization, String pending,
                                   boolean platformAdmin) {
+    }
+
+    /**
+     * 登录后的落点：普通用户去组织选择页；没有组织可绑定的平台管理员（平台级账号不一定属于任何组织）
+     * 回首页，否则会被组织选择页挡住，而管理页本来与组织无关。
+     */
+    private String nextStep(Authentication authentication) {
+        if (isPlatformAdmin(authentication)
+                && authentication.getPrincipal() instanceof AuthenticatedUser user
+                && this.identityRepository.findOrganizations(user.id()).isEmpty()) {
+            return "/";
+        }
+        return "/organizations";
+    }
+
+    private static boolean isPlatformAdmin(Authentication authentication) {
+        return authentication.getAuthorities().stream()
+                .anyMatch((authority) -> PlatformAdmin.AUTHORITY.equals(authority.getAuthority()));
     }
 }

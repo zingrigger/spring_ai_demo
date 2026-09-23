@@ -7,7 +7,8 @@
 auth:
   issuer: http://localhost:8083
   admin:
-    accounts: alice
+    # alice 属于组织，superadmin fixture 账号不属于任何组织：两者都要覆盖到。
+    accounts: alice,superadmin
   keystore:
     location: classpath:keystore/auth-server-test.p12
     password: changeit

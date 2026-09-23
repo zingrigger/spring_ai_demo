@@ -63,6 +63,15 @@ class PlatformAdminAccessTest {
     }
 
     @Test
+    void platformAdminsWithoutAnOrganizationPassTheSecurityFilter() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        login(session, "superadmin", "test@123..");
+
+        this.mockMvc.perform(get("/api/admin/clients").session(session))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void sessionExposesThePlatformAdminFlag() throws Exception {
         MockHttpSession adminSession = new MockHttpSession();
         login(adminSession, "alice", "alice-password");

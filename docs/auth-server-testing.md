@@ -90,6 +90,7 @@ curl -s -XPOST http://localhost:8083/oauth2/introspect \
 | 用途 | 值 |
 | --- | --- |
 | 用户 | `alice` / `alice-password`、`bob` / `bob-password`（测试 fixture） |
+| 平台管理员（不属于任何组织） | `superadmin` / `test@123..`（测试 fixture） |
 | `auth-web-public` secret | `auth-web-secret` |
 | `auth-machine` secret | `auth-machine-secret` |
 | `weather-mcp-inspector` | 公钥客户端（无 secret，授权码 + PKCE） |
@@ -109,7 +110,10 @@ Spring Security 的 `DelegatingPasswordEncoder` 期望 `{bcrypt}$2a$...` 形式�
 
 ## 客户端管理验收
 
-1. `AUTH_ADMIN_ACCOUNTS=alice mvn -pl auth-server spring-boot:run`，用 alice 登录 auth-web。
+1. `AUTH_ADMIN_ACCOUNTS=alice,superadmin mvn -pl auth-server spring-boot:run`，用 alice 登录 auth-web。
+   平台管理员必须出现在 `AUTH_ADMIN_ACCOUNTS` 里，否则 `/api/admin/**` 返回 403，前端会把
+   `/admin/clients` 送回组织选择页（看起来像"没有可用的组织"）。`superadmin` 不属于任何组织，
+   登录后直接回首页，从首页进入“客户端管理”。
 2. 首页进入“客户端管理” → 新建机器客户端（scopes 填 `weather:read`），保存弹窗里的 secret。
 3. 用该 client 走 client_credentials 取得 token：
    `curl -u <client_id>:<secret> -d 'grant_type=client_credentials&scope=weather:read' http://localhost:8083/oauth2/token`

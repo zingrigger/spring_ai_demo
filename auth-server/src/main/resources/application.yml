@@ -37,4 +37,4 @@ auth:
     session-idle-timeout: ${AUTH_SESSION_IDLE_TIMEOUT:PT30M}
   admin:
     # 平台管理员账号（逗号分隔）；只有这些账号能访问 /api/admin/**
-    accounts: ${AUTH_ADMIN_ACCOUNTS:}
+    accounts: ${AUTH_ADMIN_ACCOUNTS:superadmin}

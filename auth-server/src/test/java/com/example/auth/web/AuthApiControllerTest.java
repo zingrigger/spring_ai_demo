@@ -63,6 +63,21 @@ class AuthApiControllerTest {
     }
 
     @Test
+    void loginSendsAnOrganizationlessPlatformAdminToTheHomePage() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        this.mockMvc.perform(post("/api/auth/login").session(session).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"account\":\"superadmin\",\"password\":\"test@123..\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.next").value("/"));
+
+        this.mockMvc.perform(get("/api/auth/session").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.platformAdmin").value(true))
+                .andExpect(jsonPath("$.organization").doesNotExist());
+    }
+
+    @Test
     void sessionExposesThePendingAuthorizationRequest() throws Exception {
         MvcResult authorize = this.mockMvc.perform(authorizeRequest())
                 .andExpect(status().is3xxRedirection())

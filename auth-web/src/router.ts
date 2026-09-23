@@ -6,6 +6,7 @@ export type GuardResult = boolean | { path: string }
 
 /**
  * 会话守卫：未登录去 /login；平台管理员放行 /admin/**；其余用户先绑定组织；
+ * 平台管理员可以是无组织账号，可以停留在首页，不会被组织选择页拦住；
  * 已有待处理授权请求时（仅在 / 与 /login 上）恢复该请求，避免打断组织与 consent 步骤。
  */
 export function createSessionGuard(load: () => Promise<SessionState>) {
@@ -18,7 +19,16 @@ export function createSessionGuard(load: () => Promise<SessionState>) {
       return session.platformAdmin ? true : { path: '/' }
     }
     if (!session.organization) {
-      return to.path === '/organizations' ? true : { path: '/organizations' }
+      if (to.path === '/organizations') {
+        return true
+      }
+      if (session.platformAdmin) {
+        if (to.path === '/') {
+          return true
+        }
+        return { path: to.path === '/login' ? '/' : '/organizations' }
+      }
+      return { path: '/organizations' }
     }
     if (session.pending && (to.path === '/' || to.path === '/login')) {
       navigate(session.pending)
