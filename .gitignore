@@ -10,3 +10,6 @@ target/
 auth-web/node_modules/
 auth-web/dist/
 .superpowers/
+# 本地验证产物：playwright-cli 的浏览器缓存与截图
+.playwright-cli/
+output/
