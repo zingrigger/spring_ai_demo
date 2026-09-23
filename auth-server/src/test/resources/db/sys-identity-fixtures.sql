@@ -40,10 +40,11 @@ CREATE TABLE sys_user_org_role (
     KEY idx_sys_user_org_role_user_org (user_id, org_id)
 );
 
--- alice-password / bob-password, hashed with BCrypt.
+-- alice-password / bob-password / test@123.., hashed with BCrypt.
 INSERT INTO sys_user (id, account, name, password) VALUES
     (1, 'alice', 'Alice', '$2a$10$GjbGmfS63PiP9AquNwCWguef/LOJ0l/fxCbpB9SDXM.XO40cPaCxK'),
-    (2, 'bob', 'Bob', '$2a$10$uTTumqOYb5ejKzGcYDpskOwlVfj1KZ1.8GsbqhgzNSjELSr3yD3Mm');
+    (2, 'bob', 'Bob', '$2a$10$uTTumqOYb5ejKzGcYDpskOwlVfj1KZ1.8GsbqhgzNSjELSr3yD3Mm'),
+    (3, 'superadmin', 'Super Admin', '$2a$10$Zpa.bf/QdB69l2QNalyuMOYCqFOsX0MB/oUha.HAyjuVSDRTo3jQq');
 
 INSERT INTO sys_org (id, name) VALUES
     (10, 'Alpha'),
