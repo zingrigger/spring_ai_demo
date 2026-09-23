@@ -16,6 +16,15 @@ vi.mock('vue-router', () => ({
   useRoute: () => ({ params: { clientId: routerMock.clientId } }),
   useRouter: () => ({ push: routerMock.push }),
 }))
+vi.mock('../src/api/auth', () => ({
+  getSession: vi.fn().mockResolvedValue({
+    authenticated: true,
+    user: { account: 'alice', name: 'Alice' },
+    organization: null,
+    pending: null,
+    platformAdmin: true,
+  }),
+}))
 vi.mock('../src/api/adminClients', () => ({
   getClient: vi.fn(),
   updateClient: vi.fn(),
@@ -23,6 +32,14 @@ vi.mock('../src/api/adminClients', () => ({
   setClientEnabled: vi.fn(),
   deleteClient: vi.fn(),
 }))
+
+const routerLinkStub = { template: '<a><slot /></a>' }
+
+function mountDetail() {
+  return mount(ClientDetailView, {
+    global: { plugins: [i18n], stubs: { RouterLink: routerLinkStub } },
+  })
+}
 
 const detail: ClientDetail = {
   clientId: 'auth-machine',
@@ -61,10 +78,11 @@ describe('ClientDetailView', () => {
   })
 
   it('loads the client and saves edited fields', async () => {
-    const wrapper = mount(ClientDetailView, { global: { plugins: [i18n] } })
+    const wrapper = mountDetail()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Auth Machine')
+    expect((wrapper.get('[data-field="clientName"]').element as HTMLInputElement).value).toBe('Auth Machine')
+    expect(wrapper.text()).toContain('auth-machine')
     await wrapper.get('[data-field="clientName"]').setValue('Renamed Machine')
     await wrapper.get('[data-field="requireProofKey"]').setValue(true)
     await wrapper.get('form').trigger('submit')
@@ -80,7 +98,7 @@ describe('ClientDetailView', () => {
 
   it('rotates the secret and shows the new value', async () => {
     vi.mocked(rotateClientSecret).mockResolvedValue({ clientSecret: 'rotated-secret' })
-    const wrapper = mount(ClientDetailView, { global: { plugins: [i18n] } })
+    const wrapper = mountDetail()
     await flushPromises()
 
     await wrapper.get('[data-action="rotate"]').trigger('click')
@@ -92,7 +110,7 @@ describe('ClientDetailView', () => {
 
   it('requires the typed client id before deleting', async () => {
     vi.mocked(deleteClient).mockResolvedValue()
-    const wrapper = mount(ClientDetailView, { global: { plugins: [i18n] } })
+    const wrapper = mountDetail()
     await flushPromises()
 
     await wrapper.get('[data-action="delete"]').trigger('click')

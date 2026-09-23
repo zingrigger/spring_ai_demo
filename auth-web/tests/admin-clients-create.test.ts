@@ -7,6 +7,23 @@ import { createClient, type CreatedClient } from '../src/api/adminClients'
 const routerMock = vi.hoisted(() => ({ push: vi.fn() }))
 vi.mock('vue-router', () => ({ useRouter: () => routerMock }))
 vi.mock('../src/api/adminClients', () => ({ createClient: vi.fn() }))
+vi.mock('../src/api/auth', () => ({
+  getSession: vi.fn().mockResolvedValue({
+    authenticated: true,
+    user: { account: 'alice', name: 'Alice' },
+    organization: null,
+    pending: null,
+    platformAdmin: true,
+  }),
+}))
+
+const routerLinkStub = { template: '<a><slot /></a>' }
+
+function mountCreate() {
+  return mount(ClientCreateView, {
+    global: { plugins: [i18n], stubs: { RouterLink: routerLinkStub } },
+  })
+}
 
 const created: CreatedClient = {
   client: {
@@ -43,11 +60,11 @@ describe('ClientCreateView', () => {
 
   it('creates a machine client and navigates only after the secret is confirmed', async () => {
     vi.mocked(createClient).mockResolvedValue(created)
-    const wrapper = mount(ClientCreateView, { global: { plugins: [i18n] } })
+    const wrapper = mountCreate()
 
     await wrapper.get('[data-field="clientId"]').setValue('api-machine')
     await wrapper.get('[data-field="clientName"]').setValue('API Machine')
-    await wrapper.get('[data-field="type"]').setValue('machine')
+    await wrapper.get('[data-field="type-machine"]').setValue(true)
     await wrapper.get('[data-field="scopes"]').setValue('weather:read')
     await wrapper.get('form').trigger('submit')
     await flushPromises()
@@ -66,5 +83,16 @@ describe('ClientCreateView', () => {
 
     await wrapper.get('[data-action="finish"]').trigger('click')
     expect(routerMock.push).toHaveBeenCalledWith('/admin/clients/api-machine')
+  })
+
+  it('offers the type presets and hides redirect fields for machine clients', async () => {
+    const wrapper = mountCreate()
+
+    expect(wrapper.text()).toContain('机器客户端')
+    expect(wrapper.text()).toContain('client_credentials')
+    expect(wrapper.find('[data-field="redirectUris"]').exists()).toBe(true)
+
+    await wrapper.get('[data-field="type-machine"]').setValue(true)
+    expect(wrapper.find('[data-field="redirectUris"]').exists()).toBe(false)
   })
 })
